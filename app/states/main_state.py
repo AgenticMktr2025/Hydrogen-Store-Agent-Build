@@ -231,7 +231,7 @@ class MainState(rx.State):
                 self.current_progress = 75
                 self.progress_message = "File plan generated."
                 yield rx.toast.success("File plan generated successfully!")
-                yield MainState.generate_all_files
+                yield rx.redirect("/files")
         except Exception as e:
             logging.exception(f"Error generating file plan: {e}")
             async with self:

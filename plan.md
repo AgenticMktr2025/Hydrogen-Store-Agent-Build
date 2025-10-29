@@ -53,6 +53,7 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 - [x] Add deployment status tracking and file count display
 - [x] Implement progress tracking through complete workflow (25% → 50% → 75% → 100%)
 - [x] Test complete workflow: Spec → File Plan → Generated Files → Review
+- [x] **Fix crash after generation by removing automatic file generation trigger**
 
 **Implementation Notes:**
 - File explorer uses flat list approach (no recursion) for stability
@@ -60,6 +61,12 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 - Selected file highlighting with click-to-view functionality
 - Review page shows file summary and deployment readiness
 - All async operations have proper loading states and error handling
+
+**Critical Fix (Post-Generation Crash):**
+- **Issue:** App crashed after file plan generation due to automatic triggering of `generate_all_files` via `yield MainState.generate_all_files`
+- **Root Cause:** Chaining background tasks creates race conditions and state management conflicts
+- **Solution:** Removed automatic trigger. Users now explicitly click "Generate Files" button on /files page
+- **Benefit:** Gives users control over each phase, prevents race conditions, more stable UX
 
 ---
 
@@ -70,14 +77,16 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 1. **Brief Input System**: Users can enter project briefs, upload/paste brand guidelines (PDF support), and optionally provide Shopify credentials
 2. **AI-Powered Spec Generation**: OpenAI gpt-4o-mini transforms natural language briefs into structured Store Spec JSON with all required fields
 3. **File Plan Generation**: LLM analyzes Store Spec and creates comprehensive Hydrogen file tree with intents
-4. **Code Generation**: Each file is generated with actual TypeScript/JSX/CSS code based on Store Spec
+4. **Code Generation**: Each file is generated with actual TypeScript/JSX/CSS code based on Store Spec (user-triggered)
 5. **File Explorer**: Interactive file browser with click-to-preview functionality
 6. **Code Preview**: Syntax-highlighted code display for all generated files
 7. **Review & Deploy**: Summary page showing file count and deployment readiness
 8. **Progress Tracking**: Real-time progress indicators through entire workflow
 
 **Workflow:**
-Brief → Generate Spec (50%) → Generate File Plan (75%) → Generate Files (85%+) → Review (100%) → Deploy
+Brief → Generate Spec (50%) → Generate File Plan (75%) → **User clicks "Generate Files"** → Files Generated (85%+) → Review (100%) → Deploy
+
+**Key Change:** File generation is now user-triggered (not automatic) to prevent race conditions and crashes.
 
 **Next Steps (Future Enhancements):**
 - GitHub PR integration for code review
@@ -95,3 +104,4 @@ Brief → Generate Spec (50%) → Generate File Plan (75%) → Generate Files (8
 - All LLM calls use gpt-4o-mini with JSON response format
 - File generation is fully functional and tested
 - UI is clean, responsive, and user-friendly
+- **Crash fix implemented:** Removed automatic file generation chaining to prevent race conditions
