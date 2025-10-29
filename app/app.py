@@ -69,8 +69,16 @@ def index() -> rx.Component:
                         class_name="mb-4",
                     ),
                     rx.el.div(
-                        rx.el.h3(
-                            "Shopify Credentials", class_name="text-lg font-semibold"
+                        rx.el.div(
+                            rx.el.h3(
+                                "Shopify Credentials",
+                                class_name="text-lg font-semibold",
+                            ),
+                            rx.el.p(
+                                "Optional. You can provide these later in the 'Review & Deploy' step.",
+                                class_name="text-sm text-gray-500",
+                            ),
+                            class_name="mb-2",
                         ),
                         rx.el.div(
                             rx.el.input(
