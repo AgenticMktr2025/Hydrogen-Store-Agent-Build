@@ -33,8 +33,8 @@ class MainState(rx.State):
     is_generating_spec: bool = False
     is_generating_plan: bool = False
     is_generating_files: bool = False
-    current_progress: int = 25
-    progress_message: str = "Brief waiting to be submitted."
+    current_progress: int = 0
+    progress_message: str = "Awaiting brief submission."
     error_message: str = ""
     selected_file: str = ""
     selected_file_content: str = ""
@@ -122,6 +122,7 @@ class MainState(rx.State):
             self.current_progress = 25
             self.progress_message = "Generating specification..."
             self.error_message = ""
+            yield
         full_schema = {
             "store": {
                 "domain": "your-store.myshopify.com",
