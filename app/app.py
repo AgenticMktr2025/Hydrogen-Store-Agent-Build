@@ -106,9 +106,19 @@ def index() -> rx.Component:
                         class_name="mb-6",
                     ),
                     rx.el.button(
-                        "Generate Specification",
+                        rx.cond(
+                            MainState.is_generating_spec,
+                            rx.spinner(class_name="mr-2"),
+                            None,
+                        ),
+                        rx.cond(
+                            MainState.is_generating_spec,
+                            "Generating...",
+                            "Generate Specification",
+                        ),
                         type="submit",
-                        class_name="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700",
+                        class_name="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center",
+                        disabled=MainState.is_generating_spec,
                     ),
                     on_submit=MainState.handle_brief_submit,
                     reset_on_submit=False,
@@ -136,6 +146,29 @@ def specs() -> rx.Component:
                     rx.el.code(MainState.spec_json_string, class_name="language-json"),
                     class_name="w-full bg-gray-100 p-4 rounded-lg mt-4 text-sm overflow-auto",
                 ),
+                rx.el.div(
+                    rx.el.a(
+                        "< Back to Brief",
+                        href="/",
+                        class_name="text-gray-600 hover:text-gray-900",
+                    ),
+                    rx.el.button(
+                        rx.cond(
+                            MainState.is_generating_plan,
+                            rx.spinner(class_name="mr-2"),
+                            None,
+                        ),
+                        rx.cond(
+                            MainState.is_generating_plan,
+                            "Generating Plan...",
+                            "Generate File Plan ->",
+                        ),
+                        on_click=MainState.generate_file_plan,
+                        class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center",
+                        disabled=MainState.is_generating_plan,
+                    ),
+                    class_name="mt-6 flex justify-between items-center",
+                ),
                 class_name="p-8",
             ),
             class_name="flex-1",
@@ -152,6 +185,19 @@ def files() -> rx.Component:
                 rx.el.h1("Generated Files", class_name="text-2xl font-bold"),
                 rx.el.p(
                     "Browse the generated project files.", class_name="text-gray-500"
+                ),
+                rx.el.div(
+                    rx.el.a(
+                        "< Back to Specification",
+                        href="/specs",
+                        class_name="text-gray-600 hover:text-gray-900",
+                    ),
+                    rx.el.a(
+                        "Review & Deploy ->",
+                        href="/review",
+                        class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
+                    ),
+                    class_name="mt-6 flex justify-between items-center",
                 ),
                 class_name="p-8",
             ),
@@ -170,6 +216,18 @@ def review() -> rx.Component:
                 rx.el.p(
                     "Review the changes and deploy to production.",
                     class_name="text-gray-500",
+                ),
+                rx.el.div(
+                    rx.el.a(
+                        "< Back to Files",
+                        href="/files",
+                        class_name="text-gray-600 hover:text-gray-900",
+                    ),
+                    rx.el.button(
+                        "Deploy to Oxygen",
+                        class_name="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700",
+                    ),
+                    class_name="mt-6 flex justify-between items-center",
                 ),
                 class_name="p-8",
             ),
