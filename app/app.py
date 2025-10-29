@@ -45,6 +45,43 @@ def specs() -> rx.Component:
     )
 
 
+def files() -> rx.Component:
+    return rx.el.div(
+        sidebar(),
+        rx.el.main(
+            rx.el.div(
+                rx.el.h1("Generated Files", class_name="text-2xl font-bold"),
+                rx.el.p(
+                    "Browse the generated project files.", class_name="text-gray-500"
+                ),
+                class_name="p-8",
+            ),
+            class_name="flex-1",
+        ),
+        class_name="flex min-h-screen w-full bg-gray-50/50",
+    )
+
+
+def review() -> rx.Component:
+    return rx.el.div(
+        sidebar(),
+        rx.el.main(
+            rx.el.div(
+                rx.el.h1("Review & Deploy", class_name="text-2xl font-bold"),
+                rx.el.p(
+                    "Review the changes and deploy to production.",
+                    class_name="text-gray-500",
+                ),
+                class_name="p-8",
+            ),
+            class_name="flex-1",
+        ),
+        class_name="flex min-h-screen w-full bg-gray-50/50",
+    )
+
+
 app = rx.App(theme=rx.theme(appearance="light"))
 app.add_page(index, route="/")
 app.add_page(specs, route="/specs")
+app.add_page(files, route="/files")
+app.add_page(review, route="/review")
