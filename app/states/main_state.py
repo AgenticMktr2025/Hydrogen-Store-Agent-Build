@@ -2,7 +2,10 @@ import reflex as rx
 import os
 import json
 import time
+import logging
 from typing import Any, TypedDict, cast
+from pypdf import PdfReader
+import io
 
 
 class TreeNode(TypedDict):
@@ -39,6 +42,25 @@ class MainState(rx.State):
     def spec_json_string(self) -> str:
         """The spec JSON as a formatted string."""
         return json.dumps(self.spec_json, indent=2) if self.spec_json else ""
+
+    @rx.event
+    async def handle_guidelines_upload(self, files: list[rx.UploadFile]):
+        """Handle the upload of a brand guidelines PDF."""
+        if not files:
+            return
+        try:
+            upload_data = await files[0].read()
+            pdf_file = io.BytesIO(upload_data)
+            reader = PdfReader(pdf_file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() or ""
+            self.brand_guidelines = text
+            yield rx.toast.success("Brand guidelines extracted from PDF.")
+        except Exception as e:
+            logging.exception(f"Error parsing PDF: {e}")
+            self.error_message = f"Failed to parse PDF: {e}"
+            yield rx.toast.error(self.error_message)
 
     def _build_tree(self, path_list: list[str]) -> list[TreeNode]:
         tree: list[TreeNode] = []

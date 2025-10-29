@@ -35,12 +35,36 @@ def index() -> rx.Component:
                             html_for="brand_guidelines",
                             class_name="font-semibold",
                         ),
-                        rx.el.textarea(
-                            id="brand_guidelines",
-                            name="brand_guidelines",
-                            placeholder="Enter your brand colors, fonts, etc...",
-                            default_value=MainState.brand_guidelines,
-                            class_name="w-full min-h-[100px] p-2 border rounded-md mt-1",
+                        rx.el.div(
+                            rx.upload.root(
+                                rx.el.div(
+                                    rx.icon(
+                                        "cloud_upload",
+                                        class_name="h-8 w-8 text-gray-400",
+                                    ),
+                                    rx.el.p(
+                                        "Drag & drop a PDF or paste text below",
+                                        class_name="text-sm text-gray-500",
+                                    ),
+                                    class_name="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-t-lg",
+                                ),
+                                id="guidelines_upload",
+                                accept={"application/pdf": [".pdf"]},
+                                multiple=False,
+                                on_drop=MainState.handle_guidelines_upload(
+                                    rx.upload_files(upload_id="guidelines_upload")
+                                ),
+                                class_name="w-full cursor-pointer bg-gray-50 hover:bg-gray-100",
+                            ),
+                            rx.el.textarea(
+                                id="brand_guidelines",
+                                name="brand_guidelines",
+                                placeholder="Enter your brand colors, fonts, etc... or drop a PDF above",
+                                default_value=MainState.brand_guidelines,
+                                on_change=MainState.set_brand_guidelines,
+                                class_name="w-full min-h-[100px] p-2 border border-t-0 rounded-b-md mt-0 focus:ring-0",
+                            ),
+                            class_name="mt-1",
                         ),
                         class_name="mb-4",
                     ),
