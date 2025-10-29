@@ -3,3 +3,4 @@ reflex==0.8.17
 PyGithub
 openai
 pypdf
+reflex-monaco

@@ -1,6 +1,7 @@
 import reflex as rx
 from app.states.main_state import MainState
 from app.components.sidebar import sidebar
+from app.files import files
 
 
 def index() -> rx.Component:
@@ -177,36 +178,6 @@ def specs() -> rx.Component:
     )
 
 
-def files() -> rx.Component:
-    return rx.el.div(
-        sidebar(),
-        rx.el.main(
-            rx.el.div(
-                rx.el.h1("Generated Files", class_name="text-2xl font-bold"),
-                rx.el.p(
-                    "Browse the generated project files.", class_name="text-gray-500"
-                ),
-                rx.el.div(
-                    rx.el.a(
-                        "< Back to Specification",
-                        href="/specs",
-                        class_name="text-gray-600 hover:text-gray-900",
-                    ),
-                    rx.el.a(
-                        "Review & Deploy ->",
-                        href="/review",
-                        class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
-                    ),
-                    class_name="mt-6 flex justify-between items-center",
-                ),
-                class_name="p-8",
-            ),
-            class_name="flex-1",
-        ),
-        class_name="flex min-h-screen w-full bg-gray-50/50",
-    )
-
-
 def review() -> rx.Component:
     return rx.el.div(
         sidebar(),
@@ -216,6 +187,25 @@ def review() -> rx.Component:
                 rx.el.p(
                     "Review the changes and deploy to production.",
                     class_name="text-gray-500",
+                ),
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.div(
+                            rx.el.h3("Generated Files", class_name="font-semibold"),
+                            rx.icon("folder-git-2", class_name="h-5 w-5 text-gray-500"),
+                            class_name="flex items-center justify-between pb-2 border-b",
+                        ),
+                        rx.el.div(
+                            rx.el.p("Total Files", class_name="text-sm text-gray-600"),
+                            rx.el.p(
+                                MainState.file_plan.keys().length().to_string(),
+                                class_name="font-semibold text-lg",
+                            ),
+                            class_name="flex items-center justify-between pt-4",
+                        ),
+                        class_name="bg-white p-4 rounded-lg border shadow-sm",
+                    ),
+                    class_name="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6",
                 ),
                 rx.el.div(
                     rx.el.a(
