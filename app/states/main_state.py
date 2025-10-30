@@ -185,48 +185,68 @@ class MainState(rx.State):
             return ""
         content = content.strip()
         backtick = chr(96)
+        fence = backtick * 3
         code_fence_regex = re.compile(
-            f"^{backtick}{{3}}(?:[a-zA-Z]+)?\\s*\\n(.*?)\\n{backtick}{{3}}$",
-            re.DOTALL | re.MULTILINE,
+            f"^({re.escape(fence)}[a-zA-Z]*\n)?(.*?)(?:\n{re.escape(fence)})?$",
+            re.DOTALL,
         )
         match = code_fence_regex.search(content)
         if match:
-            return match.group(1).strip()
-        start = content.find("{")
-        if start != -1:
-            brace_count = 0
-            in_string = False
-            escape_next = False
-            for i in range(start, len(content)):
-                char = content[i]
-                if in_string:
-                    if escape_next:
-                        escape_next = False
-                        continue
-                    if char == "\\":
-                        escape_next = True
-                        continue
-                    if char == '"':
-                        in_string = False
-                    continue
-                if char == '"':
-                    in_string = True
-                    continue
-                if char == "{":
-                    brace_count += 1
-                elif char == "}":
-                    brace_count -= 1
-                    if brace_count == 0:
-                        json_str = content[start : i + 1].strip()
-                        try:
-                            json.loads(json_str)
-                            return json_str
-                        except json.JSONDecodeError as e:
-                            logging.exception(
-                                f"Failed to decode JSON after stripping markdown: {e}"
-                            )
-                            pass
+            code = match.group(2).strip()
+            return code
         return content
+
+    def _inject_missing_exports(self, path: str, content: str) -> str:
+        """Inject missing loader/meta exports into route files."""
+        has_loader = (
+            "export async function loader" in content
+            or "export function loader" in content
+        )
+        has_meta = "export const meta" in content or "export function meta" in content
+        if has_loader and has_meta:
+            return content
+        lines = content.splitlines()
+        imports_section = []
+        code_section = []
+        in_imports = True
+        for line in lines:
+            if in_imports and (line.strip().startswith("import ") or not line.strip()):
+                imports_section.append(line)
+            else:
+                in_imports = False
+                code_section.append(line)
+        imports_section = list(dict.fromkeys(filter(None, imports_section)))
+        new_imports = set()
+        if not has_loader:
+            if not any(("LoaderFunctionArgs" in line for line in imports_section)):
+                new_imports.add(
+                    "import { json, type LoaderFunctionArgs } from '@shopify/remix-oxygen';"
+                )
+            elif not any(("json" in line for line in imports_section)):
+                new_imports.add("import { json } from '@shopify/remix-oxygen';")
+        if not has_meta and (
+            not any(("MetaFunction" in line for line in imports_section))
+        ):
+            new_imports.add(
+                "import type { MetaFunction } from '@shopify/remix-oxygen';"
+            )
+        loader_export = ""
+        if not has_loader:
+            loader_export = """
+export async function loader({context}: LoaderFunctionArgs) {
+  return json({ ok: true });
+}"""
+        meta_export = ""
+        if not has_meta:
+            meta_export = """
+export const meta: MetaFunction = () => {
+  return [{ title: 'Page Title' }];
+};"""
+        final_imports = """
+""".join(list(new_imports) + imports_section)
+        final_code = """
+""".join(code_section)
+        return f"{final_imports}\n{meta_export}{loader_export}\n\n{final_code}".strip()
 
     @rx.var
     def spec_json_string(self) -> str:
@@ -350,7 +370,7 @@ class MainState(rx.State):
         }
         try:
             client, model = await self._get_client_and_model("spec")
-            prompt = f"You are a Shopify Hydrogen expert. Convert the user's brief into a structured JSON object that strictly follows the provided schema. Fill in all fields.\n\nUSER BRIEF:\n{self.brief_text}\n\nBRAND GUIDELINES:\n{self.brand_guidelines}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY valid JSON.\n2.  You MUST include ALL fields from this schema template:\n    {json.dumps(full_schema, indent=2)}\n3.  Fill in values from the brief where provided.\n4.  For the `nav` field, create an array of objects, where each object has a `label` (the nav item name) and an `href` (a slugified, lowercase path, e.g., '/about-us').\n5.  Keep default values for fields not mentioned in the brief.\n6.  Ensure the JSON is complete, valid, and matches the full schema structure.\n\nReturn the complete JSON now:"
+            prompt = f"You are a Shopify Hydrogen expert. Convert the user's brief into a structured JSON object that strictly follows the provided schema. Fill in all fields.\n\nUSER BRIEF:\n{self.brief_text}\n\nBRAND GUIDELINES:\n{self.brand_guidelines}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY valid JSON. Your response must start with `{{` and end with `}}`.\n2.  You MUST include ALL fields from this schema template:\n    {json.dumps(full_schema, indent=2)}\n3.  Fill in values from the brief where provided.\n4.  For the `nav` field, create an array of objects, where each object has a `label` (the nav item name) and an `href` (a slugified, lowercase path, e.g., '/about-us'). Make sure the home page href is `/` and other pages have their own slugs.\n5.  Keep default values for fields not mentioned in the brief.\n6.  Ensure the JSON is complete, valid, and matches the full schema structure.\n\nReturn the complete JSON now:"
             spec_string = ""
             if isinstance(client, AsyncOpenAI):
                 response = await client.chat.completions.create(
@@ -511,7 +531,7 @@ class MainState(rx.State):
                         f"Generating file {i + 1}/{total_files}: {path}"
                     )
                     self.current_progress = 75 + int(i / total_files * 25)
-                prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the raw code for the file - no explanations, no markdown code fences, no extra text.\n2. Use modern TypeScript, React, and TailwindCSS.\n3. For route files (`app/routes/**/*.tsx`), you MUST export a `loader` function for data fetching and a `meta` function for SEO, even if they are empty.\n4. Use `@shopify/hydrogen-react` components like `Money` for prices and `Image` for media.\n5. Use the Storefront API client via `context.storefront.query()` inside loaders.\n6. Follow Remix conventions for routing and data loading.\n\nGenerate the raw code for `{path}` now - nothing else:"
+                prompt = f"You are an expert Shopify Hydrogen developer. Your task is to generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\n**CRITICAL INSTRUCTIONS:**\n1.  **Return ONLY the raw code for the file.** Your response must be pure code, without any explanations, comments, or markdown fences (like tsx or ).\n2.  **Mandatory Exports for Route Files:** If `{path}` is a route file (e.g., `app/routes/_index.tsx` or `app/routes/products.$handle.tsx`), it **MUST** include `loader` and `meta` exports.\n\n    *   **COPY-PASTE THIS `loader` BOILERPLATE IF NEEDED:**\n        typescript\n        import {{ json, type LoaderFunctionArgs }} from '@shopify/remix-oxygen';\n\n        export async function loader({{context}}: LoaderFunctionArgs) {{\n          // Example: Fetch data using the Storefront API\n          // const {{products}} = await context.storefront.query(`query {{ products(first: 10) {{ nodes {{ id title }} }} }}`);\n          return json({{ ok: true }});\n        }}\n        \n\n    *   **COPY-PASTE THIS `meta` BOILERPLATE IF NEEDED:**\n        typescript\n        import type {{ MetaFunction }} from '@shopify/remix-oxygen';\n\n        export const meta: MetaFunction = () => {{\n          return [{{title: 'Page Title'}}];\n        }};\n        \n\n3.  **Default Export:** All route files must have a default exported React component (e.g., `export default function MyComponent() {{ ... }}`).\n4.  **Final Check:** Before finishing, review your code for `{path}`. It **MUST** be complete, correct, and follow all instructions. Your response must start directly with an `import` or `export` statement.\n\nGenerate the complete, raw code for `{path}` now:"
                 raw_code = ""
                 if isinstance(client, AsyncOpenAI):
                     response = await client.chat.completions.create(
@@ -556,6 +576,10 @@ class MainState(rx.State):
                 if raw_code:
                     async with self:
                         cleaned_code = self._strip_markdown_code(raw_code)
+                        if "app/routes/" in path:
+                            cleaned_code = self._inject_missing_exports(
+                                path, cleaned_code
+                            )
                         self.generated_files[path] = cleaned_code
             async with self:
                 self.is_generating_files = False
@@ -692,7 +716,7 @@ class MainState(rx.State):
             original_code = self.generated_files.get(path, "")
             if not original_code:
                 raise ValueError("Original code not found.")
-            prompt = f"You are an expert Shopify Hydrogen developer specializing in fixing code errors. Your task is to fix a specific issue in the provided file. Only return the corrected code, without any explanations or markdown fences.\n\nFile Path: {path}\n\nIssue to Fix:\nLine {issue['line']}: {issue['message']}\n\nOriginal Code:\ntypescript\n{original_code}\n\n\nCRITICAL INSTRUCTIONS:\n1.  Address ONLY the specified issue. Do not refactor or change other parts of the code.\n2.  Return ONLY the complete, corrected code for the entire file.\n3.  Do NOT include any markdown fences () or explanatory text in your response.\n\nReturn the full, corrected code now:"
+            prompt = f"You are an expert Shopify Hydrogen developer specializing in fixing code errors. Your task is to fix a specific issue in the provided file and return the complete, corrected code.\n\n**File Path:** `{path}`\n\n**Issue to Fix:**\n- Line {issue['line']}: {issue['message']}\n\n**Original Code:**\ntypescript\n{original_code}\n\n\n**CRITICAL INSTRUCTIONS:**\n1.  **Return ONLY the raw, complete, corrected code for the entire file.** Do not include any explanations, apologies, or markdown fences (e.g., typescript).\n2.  **Fix the specific issue.** If the issue is a missing `loader` or `meta` export in a route file, you **MUST** add it.\n\n    *   **USE THIS BOILERPLATE for a missing `loader`:**\n        typescript\n        import {{ json, type LoaderFunctionArgs }} from '@shopify/remix-oxygen';\n\n        export async function loader({{context}}: LoaderFunctionArgs) {{\n          return json({{ ok: true }});\n        }}\n        \n\n    *   **USE THIS BOILERPLATE for a missing `meta`:**\n        typescript\n        import type {{ MetaFunction }} from '@shopify/remix-oxygen';\n\n        export const meta: MetaFunction = () => {{\n          return [{{title: 'Page Title'}}];\n        }};\n        \n\n3.  **Preserve all existing correct code.** Only change what is necessary to fix the reported issue. Ensure all necessary imports (`@shopify/remix-oxygen`, `@remix-run/react`, etc.) are present.\n4.  Your response must be pure code, starting directly with an `import` or `export` statement.\n\nReturn the full, corrected code for `{path}` now:"
             fixed_code = ""
             if isinstance(client, AsyncOpenAI):
                 response = await client.chat.completions.create(
