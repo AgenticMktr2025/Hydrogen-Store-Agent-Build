@@ -4,3 +4,4 @@ PyGithub
 openai
 pypdf
 reflex-monaco
+anthropic

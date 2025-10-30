@@ -4,7 +4,7 @@ import json
 import time
 import logging
 from typing import Any, TypedDict, cast
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIConnectionError
 from pypdf import PdfReader
 import io
 
@@ -30,6 +30,7 @@ class MainState(rx.State):
     mistral_api_key: str = ""
     openrouter_api_key: str = ""
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
     spec_json: dict[str, JsonValue] = {}
     file_plan: dict[str, JsonValue] = {}
     generated_files: dict[str, str] = {}
@@ -39,6 +40,7 @@ class MainState(rx.State):
     is_testing_mistral: bool = False
     is_testing_openrouter: bool = False
     is_testing_openai: bool = False
+    is_testing_anthropic: bool = False
     current_progress: int = 0
     progress_message: str = "Awaiting brief submission."
     error_message: str = ""
@@ -188,18 +190,7 @@ class MainState(rx.State):
             "environments": {"preview": True, "production": True},
         }
         try:
-            api_key = os.environ.get("MISTRAL_API_KEY")
-            base_url = "https://api.mistral.ai/v1"
-            model = "mistral-tiny"
-            if not api_key:
-                api_key = os.environ.get("OPENROUTER_API_KEY")
-                base_url = "https://openrouter.ai/api/v1"
-                model = "moonshotai/kimi-k2:free"
-            if not api_key:
-                api_key = os.environ.get("OPENAI_API_KEY")
-                base_url = None
-                model = "gpt-4o-mini"
-            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+            client, model = await self._get_client_and_model("spec")
             prompt = f"You are a Shopify Hydrogen expert. Convert the user's brief into a structured JSON object that strictly follows the provided schema. Fill in all fields.\n\nUSER BRIEF:\n{self.brief_text}\n\nBRAND GUIDELINES:\n{self.brand_guidelines}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY valid JSON.\n2.  You MUST include ALL fields from this schema template:\n    {json.dumps(full_schema, indent=2)}\n3.  Fill in values from the brief where provided.\n4.  For the `nav` field, create an array of objects, where each object has a `label` (the nav item name) and an `href` (a slugified, lowercase path, e.g., '/about-us').\n5.  Keep default values for fields not mentioned in the brief.\n6.  Ensure the JSON is complete, valid, and matches the full schema structure.\n\nReturn the complete JSON now:"
             response = await client.chat.completions.create(
                 model=model,
@@ -248,18 +239,7 @@ class MainState(rx.State):
             self.progress_message = "Generating file plan..."
             self.error_message = ""
         try:
-            api_key = os.environ.get("MISTRAL_API_KEY")
-            base_url = "https://api.mistral.ai/v1"
-            model = "mistral-tiny"
-            if not api_key:
-                api_key = os.environ.get("OPENROUTER_API_KEY")
-                base_url = "https://openrouter.ai/api/v1"
-                model = "minimax/minimax-m2:free"
-            if not api_key:
-                api_key = os.environ.get("OPENAI_API_KEY")
-                base_url = None
-                model = "gpt-4o-mini"
-            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+            client, model = await self._get_client_and_model("plan")
             prompt = f"""You are a Shopify Hydrogen expert. Based on the provided Store Spec JSON, generate a file plan for a new Hydrogen project. The file plan should be a JSON object where keys are file paths and values are a brief description of the file's purpose (the 'intent').\n\nStore Spec:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY a valid JSON object representing the file plan.\n2.  Include all necessary files for a basic Hydrogen project: routes, components, styles, and configuration.\n3.  Create routes based on the `nav` and `catalog` sections of the spec.\n4.  Create components for header, footer, product cards, etc.\n5.  Structure the file paths correctly (e.g., `app/routes/_index.tsx`, `app/components/Header.tsx`).\n6.  The output must be a single JSON object with file paths as keys and string descriptions as values.\n\nExample Output Format:\n{{\n  "app/root.tsx": "React Router root, theme provider, and global layout.",\n  "app/routes/_index.tsx": "The home page component.",\n  "app/components/Header.tsx": "Site header with navigation derived from spec."\n}}\n\nGenerate the complete file plan now."""
             response = await client.chat.completions.create(
                 model=model,
@@ -303,18 +283,7 @@ class MainState(rx.State):
             self.progress_message = "Generating files..."
             self.generated_files = {}
         try:
-            api_key = os.environ.get("MISTRAL_API_KEY")
-            base_url = "https://api.mistral.ai/v1"
-            model = "mistral-large-latest"
-            if not api_key:
-                api_key = os.environ.get("OPENROUTER_API_KEY")
-                base_url = "https://openrouter.ai/api/v1"
-                model = "deepseek/deepseek-chat"
-            if not api_key:
-                api_key = os.environ.get("OPENAI_API_KEY")
-                base_url = None
-                model = "gpt-4o-mini"
-            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+            client, model = await self._get_client_and_model("code")
             file_items = list(self.file_plan.items())
             total_files = len(file_items)
             for i, (path, intent) in enumerate(file_items):
@@ -418,6 +387,62 @@ class MainState(rx.State):
         finally:
             async with self:
                 self.is_testing_openai = False
+
+    async def _get_client_and_model(self, task: str) -> tuple[AsyncOpenAI, str]:
+        openrouter_models = {
+            "spec": "minimax/minimax-m2:free",
+            "plan": "minimax/minimax-m2:free",
+            "code": "deepseek/deepseek-chat",
+        }
+        openrouter_fallbacks = [
+            "deepseek/deepseek-chat-v3.1:free",
+            "moonshotai/kimi-k2:free",
+            "nvidia/nemotron-nano-9b-v2:free",
+            "openai/gpt-oss-20b:free",
+        ]
+        if self.openrouter_api_key:
+            client = AsyncOpenAI(
+                api_key=self.openrouter_api_key, base_url="https://openrouter.ai/api/v1"
+            )
+            primary_model = openrouter_models.get(task, "minimax/minimax-m2:free")
+            try:
+                await client.models.retrieve(primary_model)
+                return (client, primary_model)
+            except Exception as e:
+                logging.exception(
+                    f"OpenRouter primary model {primary_model} failed, trying fallbacks: {e}"
+                )
+            for model in openrouter_fallbacks:
+                try:
+                    await client.models.retrieve(model)
+                    return (client, model)
+                except Exception as e:
+                    logging.exception(f"OpenRouter fallback model {model} failed: {e}")
+                    continue
+        if self.mistral_api_key:
+            try:
+                client = AsyncOpenAI(
+                    api_key=self.mistral_api_key, base_url="https://api.mistral.ai/v1"
+                )
+                model = "mistral-large-latest" if task == "code" else "mistral-tiny"
+                await client.models.retrieve(model)
+                return (client, model)
+            except Exception as e:
+                logging.exception(f"Mistral connection failed: {e}")
+        if self.openai_api_key:
+            try:
+                client = AsyncOpenAI(api_key=self.openai_api_key)
+                model = "gpt-4o"
+                await client.models.retrieve(model)
+                return (client, model)
+            except Exception as e:
+                logging.exception(f"OpenAI connection failed: {e}")
+        if self.anthropic_api_key:
+            try:
+                logging.info("Anthropic client would be used here.")
+            except Exception as e:
+                logging.exception(f"Anthropic connection failed: {e}")
+        raise ValueError("No valid API key or connection available for any provider.")
 
     @rx.event
     def handle_brief_submit(self, form_data: dict[str, Any]):
