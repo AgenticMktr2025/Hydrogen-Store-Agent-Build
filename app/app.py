@@ -331,6 +331,31 @@ def settings() -> rx.Component:
                         ),
                         class_name="mb-4",
                     ),
+                    rx.el.div(
+                        rx.el.label("MistralAI API Key", class_name="font-medium"),
+                        rx.el.div(
+                            rx.el.input(
+                                placeholder="Enter your MistralAI API Key",
+                                name="mistralai_api_key",
+                                default_value=MainState.mistralai_api_key,
+                                on_change=MainState.set_mistralai_api_key,
+                                class_name="w-full p-2 border rounded-md",
+                                type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_mistralai,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    "Test",
+                                ),
+                                on_click=MainState.test_mistralai_connection,
+                                disabled=MainState.is_testing_mistralai,
+                                class_name="bg-gray-200 px-4 py-2 rounded-md text-sm",
+                            ),
+                            class_name="flex items-center gap-2 mt-1",
+                        ),
+                        class_name="mb-4",
+                    ),
                     class_name="mt-6 bg-white p-6 rounded-lg border shadow-sm",
                 ),
                 class_name="p-8",

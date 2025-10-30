@@ -8,6 +8,8 @@ from openai import AsyncOpenAI
 from pypdf import PdfReader
 import io
 import anthropic
+import mistralai
+from mistralai.client import MistralClient as MistralAsyncClient
 
 
 class TreeNode(TypedDict):
@@ -31,6 +33,7 @@ class MainState(rx.State):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     openrouter_api_key: str = ""
+    mistralai_api_key: str = ""
     spec_json: dict[str, JsonValue] = {}
     file_plan: dict[str, JsonValue] = {}
     generated_files: dict[str, str] = {}
@@ -40,6 +43,7 @@ class MainState(rx.State):
     is_testing_openai: bool = False
     is_testing_anthropic: bool = False
     is_testing_openrouter: bool = False
+    is_testing_mistralai: bool = False
     is_validating: bool = False
     validation_results: dict[str, list[dict]] = {}
     current_progress: int = 0
@@ -119,6 +123,25 @@ class MainState(rx.State):
             async with self:
                 self.is_testing_openrouter = False
                 yield rx.toast.error(f"OpenRouter connection failed: {e}")
+
+    @rx.event(background=True)
+    async def test_mistralai_connection(self):
+        async with self:
+            self.is_testing_mistralai = True
+            yield
+        try:
+            if not self.mistralai_api_key:
+                raise ValueError("MistralAI API Key is not set.")
+            client = MistralAsyncClient(api_key=self.mistralai_api_key)
+            await client.models.list()
+            async with self:
+                self.is_testing_mistralai = False
+                yield rx.toast.success("MistralAI connection successful!")
+        except Exception as e:
+            logging.exception(f"MistralAI connection test failed: {e}")
+            async with self:
+                self.is_testing_mistralai = False
+                yield rx.toast.error(f"MistralAI connection failed: {e}")
 
     @rx.var
     def validation_passed(self) -> bool:
@@ -482,11 +505,12 @@ class MainState(rx.State):
 
     async def _get_client_and_model(
         self, task: str
-    ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
+    ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic | MistralAsyncClient, str]:
         """Gets the best available AI client and model, checking env vars."""
         openrouter_key = (
             os.getenv("OPENROUTER_API_KEY") or self.openrouter_api_key or None
         )
+        mistral_key = os.getenv("MISTRALAI_API_KEY") or self.mistralai_api_key or None
         openai_key = os.getenv("OPENAI_API_KEY") or self.openai_api_key or None
         anthropic_key = os.getenv("ANTHROPIC_API_KEY") or self.anthropic_api_key or None
         if openrouter_key:
@@ -500,17 +524,38 @@ class MainState(rx.State):
                         "X-Title": "Hydrogen Builder",
                     },
                 )
-                await client.models.list()
-                if task in ("spec", "plan"):
-                    model = "deepseek/deepseek-chat-v3.1:free"
-                else:
-                    model = "minimax/minimax-chat-v2-10b"
+                await client.chat.completions.create(
+                    model="openrouter/auto",
+                    messages=[{"role": "user", "content": "test"}],
+                    max_tokens=10,
+                )
+                model = (
+                    "deepseek/deepseek-chat-v3.1:free"
+                    if task in ("spec", "plan")
+                    else "minimax/minimax-chat-v2-10b"
+                )
                 logging.info(
                     f"Successfully connected to OpenRouter. Using model: {model}"
                 )
                 return (client, model)
             except Exception as e:
                 logging.exception(f"OpenRouter connection failed: {e}. Falling back.")
+        if mistral_key:
+            try:
+                logging.info("Attempting to use MistralAI...")
+                client = MistralAsyncClient(api_key=mistral_key)
+                await client.models.list()
+                model = (
+                    "mistral-small-latest"
+                    if task in ("spec", "plan")
+                    else "mistral-large-latest"
+                )
+                logging.info(
+                    f"Successfully connected to MistralAI. Using model: {model}"
+                )
+                return (client, model)
+            except Exception as e:
+                logging.exception(f"MistralAI connection failed: {e}. Falling back.")
         if openai_key:
             try:
                 logging.info("Attempting to use OpenAI...")
@@ -525,7 +570,11 @@ class MainState(rx.State):
             try:
                 logging.info("Attempting to use Anthropic...")
                 client = anthropic.AsyncAnthropic(api_key=anthropic_key)
-                model = "claude-3-haiku-20240307"
+                model = (
+                    "claude-haiku-4-5-20251001"
+                    if task in ("spec", "plan")
+                    else "claude-sonnet-4-5-20250929"
+                )
                 await client.messages.create(
                     model=model,
                     max_tokens=1,
@@ -540,7 +589,7 @@ class MainState(rx.State):
                     f"Anthropic connection failed: {e}. No providers left."
                 )
         raise ValueError(
-            "No valid API key or connection available for any provider. Checked OpenRouter, OpenAI, and Anthropic."
+            "No valid API key or connection available for any provider. Checked OpenRouter, Mistral, OpenAI, and Anthropic."
         )
 
     @rx.event
