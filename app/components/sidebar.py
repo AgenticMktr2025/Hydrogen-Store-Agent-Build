@@ -30,6 +30,12 @@ def sidebar() -> rx.Component:
             rx.el.div(
                 rx.el.nav(
                     nav_item(
+                        "Settings",
+                        "/settings",
+                        "settings",
+                        MainState.router.page.path == "/settings",
+                    ),
+                    nav_item(
                         "Brief", "/", "file-text", MainState.router.page.path == "/"
                     ),
                     nav_item(
@@ -49,12 +55,6 @@ def sidebar() -> rx.Component:
                         "/review",
                         "git-pull-request-draft",
                         MainState.router.page.path == "/review",
-                    ),
-                    nav_item(
-                        "Settings",
-                        "/settings",
-                        "settings",
-                        MainState.router.page.path == "/settings",
                     ),
                     class_name="grid items-start px-4 text-sm font-medium",
                 ),
