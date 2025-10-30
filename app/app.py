@@ -348,8 +348,105 @@ def deploy() -> rx.Component:
 
 app = rx.App(theme=rx.theme(appearance="light"))
 app.add_page(index, route="/")
+
+
+def validate() -> rx.Component:
+    return rx.el.div(
+        sidebar(),
+        rx.el.main(
+            rx.el.div(
+                rx.el.h1("Validate Code", class_name="text-2xl font-bold"),
+                rx.el.p(
+                    "Check generated files for errors before deployment.",
+                    class_name="text-gray-500 mb-4",
+                ),
+                rx.el.div(
+                    rx.el.a(
+                        "< Back to Files",
+                        href="/files",
+                        class_name="text-gray-600 hover:text-gray-900",
+                    ),
+                    rx.el.button(
+                        rx.cond(
+                            MainState.is_validating, rx.spinner(class_name="mr-2"), None
+                        ),
+                        rx.cond(
+                            MainState.is_validating, "Validating...", "Run Validation"
+                        ),
+                        on_click=MainState.validate_all_files,
+                        disabled=MainState.is_validating,
+                        class_name="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center",
+                    ),
+                    rx.el.a(
+                        "Proceed to Review ->",
+                        href="/review",
+                        class_name=rx.cond(
+                            MainState.validation_passed,
+                            "bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
+                            "bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed",
+                        ),
+                    ),
+                    class_name="flex justify-between items-center w-full mb-6",
+                ),
+                rx.cond(
+                    MainState.validation_results.length() > 0,
+                    rx.el.div(
+                        rx.el.h3("Validation Issues", class_name="font-semibold mb-2"),
+                        rx.foreach(
+                            MainState.validation_results.keys(),
+                            lambda path: rx.el.div(
+                                rx.el.h4(
+                                    path,
+                                    class_name="font-medium text-red-600 bg-red-50 p-2 rounded-t-lg",
+                                ),
+                                rx.foreach(
+                                    MainState.validation_results[path],
+                                    lambda issue: rx.el.div(
+                                        rx.el.span(
+                                            f"L{issue['line']}:",
+                                            class_name="font-mono text-xs mr-2 text-gray-500",
+                                        ),
+                                        rx.el.span(
+                                            issue["message"], class_name="text-sm"
+                                        ),
+                                        class_name="p-2 border-b",
+                                    ),
+                                ),
+                                class_name="mb-4 border rounded-lg bg-white",
+                            ),
+                        ),
+                    ),
+                    rx.cond(
+                        MainState.is_validating,
+                        rx.el.div(
+                            rx.spinner(),
+                            rx.el.p("Running validation...", class_name="ml-2"),
+                            class_name="flex items-center justify-center h-64",
+                        ),
+                        rx.el.div(
+                            rx.icon(
+                                "square_check",
+                                class_name="h-16 w-16 text-green-500 mb-4",
+                            ),
+                            rx.el.h3(
+                                "All files passed validation!",
+                                class_name="text-xl font-semibold",
+                            ),
+                            class_name="flex flex-col items-center justify-center h-64 bg-green-50 rounded-lg border-2 border-dashed border-green-200",
+                        ),
+                    ),
+                ),
+                class_name="p-8",
+            ),
+            class_name="flex-1",
+        ),
+        class_name="flex min-h-screen w-full bg-gray-50/50",
+    )
+
+
 app.add_page(specs, route="/specs")
 app.add_page(files, route="/files")
+app.add_page(validate, route="/validate")
 app.add_page(review, route="/review")
 app.add_page(deploy, route="/deploy")
 app.add_page(settings, route="/settings")

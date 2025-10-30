@@ -51,6 +51,12 @@ def sidebar() -> rx.Component:
                         MainState.router.page.path == "/files",
                     ),
                     nav_item(
+                        "Validate",
+                        "/validate",
+                        "shield-check",
+                        MainState.router.page.path == "/validate",
+                    ),
+                    nav_item(
                         "Review",
                         "/review",
                         "git-pull-request-draft",

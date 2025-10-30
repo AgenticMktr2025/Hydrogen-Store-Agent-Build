@@ -41,11 +41,47 @@ class MainState(rx.State):
     is_testing_openrouter: bool = False
     is_testing_openai: bool = False
     is_testing_anthropic: bool = False
+    is_validating: bool = False
+    validation_results: dict[str, list[dict]] = {}
     current_progress: int = 0
     progress_message: str = "Awaiting brief submission."
     error_message: str = ""
     selected_file: str = ""
     selected_file_content: str = ""
+
+    @rx.var
+    def validation_passed(self) -> bool:
+        """Check if all files passed validation."""
+        if not self.validation_results:
+            return False
+        return not any(self.validation_results.values())
+
+    @rx.event(background=True)
+    async def validate_all_files(self):
+        """Validate all generated files for common issues."""
+        from app.validation.validator import CodeValidator
+
+        validator = CodeValidator()
+        async with self:
+            self.is_validating = True
+            self.progress_message = "Validating generated files..."
+            self.current_progress = 92
+            self.validation_results = {}
+            yield
+        results = {}
+        for path, content in self.generated_files.items():
+            issues = validator.validate_file(path, content)
+            if issues:
+                results[path] = issues
+        async with self:
+            self.validation_results = results
+            self.is_validating = False
+            if not results:
+                self.progress_message = "Validation passed!"
+                yield rx.toast.success("All files passed validation.")
+            else:
+                self.progress_message = f"Validation failed for {len(results)} files."
+                yield rx.toast.warning("Validation issues found.")
 
     def _strip_markdown_code(self, content: str | None) -> str:
         """Strips markdown code fences from a string."""

@@ -5,3 +5,5 @@ openai
 pypdf
 reflex-monaco
 anthropic
+together
+nemoguardrails

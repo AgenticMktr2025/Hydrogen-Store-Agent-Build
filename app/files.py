@@ -51,8 +51,8 @@ def files() -> rx.Component:
                             class_name="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center",
                         ),
                         rx.el.a(
-                            "Review & Deploy ->",
-                            href="/review",
+                            "Validate Files ->",
+                            href="/validate",
                             class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
                         ),
                         class_name="flex justify-between items-center w-full mb-6",
