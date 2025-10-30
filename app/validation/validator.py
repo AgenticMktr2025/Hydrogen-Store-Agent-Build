@@ -13,7 +13,10 @@ class CodeValidator:
     def validate_file(self, path: str, content: str) -> list[ValidationIssue]:
         issues = []
         lines = content.splitlines()
-        if content.strip().startswith("") and content.strip().endswith(""):
+        backtick = chr(96)
+        if content.strip().startswith(f"{backtick * 3}") and content.strip().endswith(
+            f"{backtick * 3}"
+        ):
             issues.append(
                 {
                     "line": 1,

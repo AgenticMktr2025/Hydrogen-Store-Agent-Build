@@ -180,22 +180,18 @@ class MainState(rx.State):
                 yield rx.toast.warning("Validation issues found.")
 
     def _strip_markdown_code(self, content: str | None) -> str:
-        """Strips markdown code fences and extracts the first valid JSON object from a string."""
+        """Strips markdown code fences and extracts code or the first valid JSON object."""
         if not content:
             return ""
         content = content.strip()
-        match = re.search(
-            "(?:json|typescript|javascript)?\\s*\\n(.*?)\\n", content, re.DOTALL
+        backtick = chr(96)
+        code_fence_regex = re.compile(
+            f"^{backtick}{{3}}(?:[a-zA-Z]+)?\\s*\\n(.*?)\\n{backtick}{{3}}$",
+            re.DOTALL | re.MULTILINE,
         )
+        match = code_fence_regex.search(content)
         if match:
-            extracted = match.group(1).strip()
-            try:
-                json.loads(extracted)
-                return extracted
-            except json.JSONDecodeError as e:
-                logging.exception(
-                    f"Failed to parse extracted content as JSON, falling back: {e}"
-                )
+            return match.group(1).strip()
         start = content.find("{")
         if start != -1:
             brace_count = 0
@@ -203,22 +199,33 @@ class MainState(rx.State):
             escape_next = False
             for i in range(start, len(content)):
                 char = content[i]
-                if escape_next:
-                    escape_next = False
+                if in_string:
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    if char == "\\":
+                        escape_next = True
+                        continue
+                    if char == '"':
+                        in_string = False
                     continue
-                if char == "\\":
-                    escape_next = True
+                if char == '"':
+                    in_string = True
                     continue
-                if char == '"' and (not escape_next):
-                    in_string = not in_string
-                    continue
-                if not in_string:
-                    if char == "{":
-                        brace_count += 1
-                    elif char == "}":
-                        brace_count -= 1
-                        if brace_count == 0:
-                            return content[start : i + 1].strip()
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_str = content[start : i + 1].strip()
+                        try:
+                            json.loads(json_str)
+                            return json_str
+                        except json.JSONDecodeError as e:
+                            logging.exception(
+                                f"Failed to decode JSON after stripping markdown: {e}"
+                            )
+                            pass
         return content
 
     @rx.var
