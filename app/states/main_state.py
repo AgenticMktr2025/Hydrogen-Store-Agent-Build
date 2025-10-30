@@ -501,7 +501,7 @@ class MainState(rx.State):
                     },
                 )
                 await client.models.list()
-                model = "deepseek/deepseek-coder"
+                model = "minimax/minimax-m2:free"
                 logging.info(
                     f"Successfully connected to OpenRouter. Using model: {model}"
                 )
