@@ -344,6 +344,20 @@ class MainState(rx.State):
                     temperature=0.2,
                 )
                 spec_string = response.content[0].text
+            elif isinstance(client, MistralAsyncClient):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert specializing in creating structured JSON specs from natural language. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                )
+                spec_string = response.choices[0].message.content
             async with self:
                 if not spec_string:
                     raise ValueError("Received empty response from AI.")
@@ -409,6 +423,20 @@ class MainState(rx.State):
                     temperature=0.1,
                 )
                 file_plan_str = response.content[0].text
+            elif isinstance(client, MistralAsyncClient):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert that generates file plans from JSON specifications. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.1,
+                )
+                file_plan_str = response.choices[0].message.content
             async with self:
                 if not file_plan_str:
                     raise ValueError("Received empty response from AI for file plan.")
@@ -476,6 +504,19 @@ class MainState(rx.State):
                         temperature=0.1,
                     )
                     raw_code = response.content[0].text
+                elif isinstance(client, MistralAsyncClient):
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.1,
+                    )
+                    raw_code = response.choices[0].message.content
                 if raw_code:
                     async with self:
                         cleaned_code = self._strip_markdown_code(raw_code)
@@ -630,6 +671,13 @@ class MainState(rx.State):
                     temperature=0.0,
                 )
                 fixed_code = response.content[0].text
+            elif isinstance(client, MistralAsyncClient):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                fixed_code = response.choices[0].message.content
             if not fixed_code:
                 raise ValueError("LLM returned an empty response.")
             cleaned_fixed_code = self._strip_markdown_code(fixed_code)
