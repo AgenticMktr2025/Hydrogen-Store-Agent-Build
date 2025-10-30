@@ -30,6 +30,7 @@ class MainState(rx.State):
     private_token: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    openrouter_api_key: str = ""
     spec_json: dict[str, JsonValue] = {}
     file_plan: dict[str, JsonValue] = {}
     generated_files: dict[str, str] = {}
@@ -38,6 +39,7 @@ class MainState(rx.State):
     is_generating_files: bool = False
     is_testing_openai: bool = False
     is_testing_anthropic: bool = False
+    is_testing_openrouter: bool = False
     is_validating: bool = False
     validation_results: dict[str, list[dict]] = {}
     current_progress: int = 0
@@ -87,6 +89,27 @@ class MainState(rx.State):
             async with self:
                 self.is_testing_anthropic = False
                 yield rx.toast.error(f"Anthropic connection failed: {e}")
+
+    @rx.event(background=True)
+    async def test_openrouter_connection(self):
+        async with self:
+            self.is_testing_openrouter = True
+            yield
+        try:
+            if not self.openrouter_api_key:
+                raise ValueError("OpenRouter API Key is not set.")
+            client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1", api_key=self.openrouter_api_key
+            )
+            await client.models.list()
+            async with self:
+                self.is_testing_openrouter = False
+                yield rx.toast.success("OpenRouter connection successful!")
+        except Exception as e:
+            logging.exception(f"OpenRouter connection test failed: {e}")
+            async with self:
+                self.is_testing_openrouter = False
+                yield rx.toast.error(f"OpenRouter connection failed: {e}")
 
     @rx.var
     def validation_passed(self) -> bool:
@@ -452,8 +475,21 @@ class MainState(rx.State):
         self, task: str
     ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
         """Gets the best available AI client and model, checking env vars."""
+        openrouter_api_key = self.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
         openai_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
         anthropic_api_key = self.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        if openrouter_api_key:
+            try:
+                logging.info("Attempting to use OpenRouter")
+                client = AsyncOpenAI(
+                    base_url="https://openrouter.ai/api/v1", api_key=openrouter_api_key
+                )
+                model = "deepseek/deepseek-coder"
+                await client.models.list()
+                logging.info(f"Using OpenRouter model: {model}")
+                return (client, model)
+            except Exception as e:
+                logging.exception(f"OpenRouter check failed: {e}. Falling back.")
         if openai_api_key:
             try:
                 logging.info("Attempting to use OpenAI")
