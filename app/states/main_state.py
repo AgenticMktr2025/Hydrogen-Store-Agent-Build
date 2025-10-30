@@ -180,17 +180,46 @@ class MainState(rx.State):
                 yield rx.toast.warning("Validation issues found.")
 
     def _strip_markdown_code(self, content: str | None) -> str:
-        """Strips markdown code fences from a string, designed for code files."""
+        """Strips markdown code fences and extracts the first valid JSON object from a string."""
         if not content:
             return ""
-        match = re.search("(?:json)?\\n(.*?)\\n", content, re.DOTALL)
+        content = content.strip()
+        match = re.search(
+            "(?:json|typescript|javascript)?\\s*\\n(.*?)\\n", content, re.DOTALL
+        )
         if match:
-            return match.group(1).strip()
+            extracted = match.group(1).strip()
+            try:
+                json.loads(extracted)
+                return extracted
+            except json.JSONDecodeError as e:
+                logging.exception(
+                    f"Failed to parse extracted content as JSON, falling back: {e}"
+                )
         start = content.find("{")
-        end = content.rfind("}")
-        if start != -1 and end != -1 and (end > start):
-            return content[start : end + 1].strip()
-        return content.strip()
+        if start != -1:
+            brace_count = 0
+            in_string = False
+            escape_next = False
+            for i in range(start, len(content)):
+                char = content[i]
+                if escape_next:
+                    escape_next = False
+                    continue
+                if char == "\\":
+                    escape_next = True
+                    continue
+                if char == '"' and (not escape_next):
+                    in_string = not in_string
+                    continue
+                if not in_string:
+                    if char == "{":
+                        brace_count += 1
+                    elif char == "}":
+                        brace_count -= 1
+                        if brace_count == 0:
+                            return content[start : i + 1].strip()
+        return content
 
     @rx.var
     def spec_json_string(self) -> str:
@@ -568,6 +597,7 @@ class MainState(rx.State):
                     if task in ("spec", "plan")
                     else "minimax/minimax-m2"
                 )
+                model = model_to_test
                 await client.chat.completions.create(
                     model=model_to_test,
                     messages=[{"role": "user", "content": "test"}],
