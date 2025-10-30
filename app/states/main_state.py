@@ -456,21 +456,6 @@ class MainState(rx.State):
                         temperature=0.1,
                     )
                     raw_code = response.content[0].text
-                if model == "qwen/qwen3-coder:free":
-                    if isinstance(client, AsyncOpenAI):
-                        response = await client.chat.completions.create(
-                            model=model,
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
-                                },
-                                {"role": "user", "content": prompt},
-                            ],
-                            temperature=0.1,
-                            max_tokens=128000,
-                        )
-                        raw_code = response.choices[0].message.content
                 if raw_code:
                     async with self:
                         self.generated_files[path] = self._strip_markdown_code(raw_code)
@@ -516,7 +501,10 @@ class MainState(rx.State):
                     },
                 )
                 await client.models.list()
-                model = "minimax/minimax-m2:free"
+                if task in ("spec", "plan"):
+                    model = "deepseek/deepseek-chat-v3.1:free"
+                else:
+                    model = "minimax/minimax-chat-v2-10b"
                 logging.info(
                     f"Successfully connected to OpenRouter. Using model: {model}"
                 )
