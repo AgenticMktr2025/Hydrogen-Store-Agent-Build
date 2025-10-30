@@ -2,6 +2,7 @@ import reflex as rx
 import os
 import json
 import logging
+import re
 from typing import Any, TypedDict, cast, ForwardRef
 from openai import AsyncOpenAI
 from pypdf import PdfReader
@@ -27,8 +28,6 @@ class MainState(rx.State):
     shopify_domain: str = ""
     storefront_token: str = ""
     private_token: str = ""
-    mistral_api_key: str = ""
-    openrouter_api_key: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     spec_json: dict[str, JsonValue] = {}
@@ -37,8 +36,6 @@ class MainState(rx.State):
     is_generating_spec: bool = False
     is_generating_plan: bool = False
     is_generating_files: bool = False
-    is_testing_mistral: bool = False
-    is_testing_openrouter: bool = False
     is_testing_openai: bool = False
     is_testing_anthropic: bool = False
     is_validating: bool = False
@@ -48,6 +45,48 @@ class MainState(rx.State):
     error_message: str = ""
     selected_file: str = ""
     selected_file_content: str = ""
+
+    @rx.event(background=True)
+    async def test_openai_connection(self):
+        async with self:
+            self.is_testing_openai = True
+            yield
+        try:
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API Key is not set.")
+            client = AsyncOpenAI(api_key=self.openai_api_key)
+            await client.models.list()
+            async with self:
+                self.is_testing_openai = False
+                yield rx.toast.success("OpenAI connection successful!")
+        except Exception as e:
+            logging.exception(f"OpenAI connection test failed: {e}")
+            async with self:
+                self.is_testing_openai = False
+                yield rx.toast.error(f"OpenAI connection failed: {e}")
+
+    @rx.event(background=True)
+    async def test_anthropic_connection(self):
+        async with self:
+            self.is_testing_anthropic = True
+            yield
+        try:
+            if not self.anthropic_api_key:
+                raise ValueError("Anthropic API Key is not set.")
+            client = anthropic.AsyncAnthropic(api_key=self.anthropic_api_key)
+            await client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "test"}],
+            )
+            async with self:
+                self.is_testing_anthropic = False
+                yield rx.toast.success("Anthropic connection successful!")
+        except Exception as e:
+            logging.exception(f"Anthropic connection test failed: {e}")
+            async with self:
+                self.is_testing_anthropic = False
+                yield rx.toast.error(f"Anthropic connection failed: {e}")
 
     @rx.var
     def validation_passed(self) -> bool:
@@ -84,17 +123,22 @@ class MainState(rx.State):
                 yield rx.toast.warning("Validation issues found.")
 
     def _strip_markdown_code(self, content: str | None) -> str:
-        """Strips markdown code fences from a string."""
+        """Strips markdown code fences and extracts the first valid JSON object from a string."""
         if not content:
             return ""
-        content = content.strip()
-        if content.startswith("") and content.endswith(""):
-            lines = content.splitlines()
-            if len(lines) > 1:
-                start_index = 1
-                return """
-""".join(lines[1:-1])
-        return content
+        backtick = chr(96)
+        fence = backtick * 3
+        if fence in content:
+            match = re.search(
+                f"{fence}(?:[a-zA-Z]+)?\\s*(.*?)\\s*{fence}", content, re.DOTALL
+            )
+            if match:
+                content = match.group(1)
+        start = content.find("{")
+        end = content.rfind("}")
+        if start != -1 and end != -1 and (end > start):
+            return content[start : end + 1]
+        return content.strip()
 
     @rx.var
     def spec_json_string(self) -> str:
@@ -408,8 +452,8 @@ class MainState(rx.State):
         self, task: str
     ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
         """Gets the best available AI client and model, checking env vars."""
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        openai_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+        anthropic_api_key = self.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
         if openai_api_key:
             try:
                 logging.info("Attempting to use OpenAI")
@@ -425,7 +469,11 @@ class MainState(rx.State):
                 logging.info("Attempting to use Anthropic")
                 client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
                 model = "claude-3-5-sonnet-20240620"
-                await client.count_tokens("test", model=model)
+                await client.messages.create(
+                    model=model,
+                    max_tokens=1,
+                    messages=[{"role": "user", "content": "test"}],
+                )
                 logging.info(f"Using Anthropic model: {model}")
                 return (client, model)
             except Exception as e:

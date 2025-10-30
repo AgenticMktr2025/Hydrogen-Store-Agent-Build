@@ -257,21 +257,6 @@ def settings() -> rx.Component:
                 rx.el.div(
                     rx.el.h3("API Keys", class_name="text-lg font-semibold mt-6 mb-2"),
                     rx.el.div(
-                        rx.el.label("Mistral API Key", class_name="font-medium"),
-                        rx.el.div(
-                            rx.el.input(
-                                placeholder="Enter your Mistral API Key",
-                                name="mistral_api_key",
-                                default_value=MainState.mistral_api_key,
-                                on_change=MainState.set_mistral_api_key,
-                                class_name="w-full p-2 border rounded-md",
-                                type="password",
-                            ),
-                            class_name="flex items-center gap-2 mt-1",
-                        ),
-                        class_name="mb-4",
-                    ),
-                    rx.el.div(
                         rx.el.label("OpenAI API Key", class_name="font-medium"),
                         rx.el.div(
                             rx.el.input(
@@ -281,6 +266,16 @@ def settings() -> rx.Component:
                                 on_change=MainState.set_openai_api_key,
                                 class_name="w-full p-2 border rounded-md",
                                 type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_openai,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    "Test",
+                                ),
+                                on_click=MainState.test_openai_connection,
+                                disabled=MainState.is_testing_openai,
+                                class_name="bg-gray-200 px-4 py-2 rounded-md text-sm",
                             ),
                             class_name="flex items-center gap-2 mt-1",
                         ),
@@ -297,6 +292,16 @@ def settings() -> rx.Component:
                                 class_name="w-full p-2 border rounded-md",
                                 type="password",
                             ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_anthropic,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    "Test",
+                                ),
+                                on_click=MainState.test_anthropic_connection,
+                                disabled=MainState.is_testing_anthropic,
+                                class_name="bg-gray-200 px-4 py-2 rounded-md text-sm",
+                            ),
                             class_name="flex items-center gap-2 mt-1",
                         ),
                         class_name="mb-4",
@@ -309,11 +314,6 @@ def settings() -> rx.Component:
         ),
         class_name="flex min-h-screen w-full bg-gray-50/50",
     )
-
-
-app = rx.App(theme=rx.theme(appearance="light"))
-app.add_page(index, route="/")
-app.add_page(specs, route="/specs")
 
 
 def deploy() -> rx.Component:
@@ -360,10 +360,6 @@ def deploy() -> rx.Component:
         ),
         class_name="flex min-h-screen w-full bg-gray-50/50",
     )
-
-
-app = rx.App(theme=rx.theme(appearance="light"))
-app.add_page(index, route="/")
 
 
 def validate() -> rx.Component:
@@ -460,6 +456,8 @@ def validate() -> rx.Component:
     )
 
 
+app = rx.App(theme=rx.theme(appearance="light"))
+app.add_page(index, route="/")
 app.add_page(specs, route="/specs")
 app.add_page(files, route="/files")
 app.add_page(validate, route="/validate")
