@@ -530,7 +530,7 @@ class MainState(rx.State):
                 await client.chat.completions.create(
                     model="openrouter/auto",
                     messages=[{"role": "user", "content": "test"}],
-                    max_tokens=10,
+                    max_tokens=20,
                 )
                 model = (
                     "deepseek/deepseek-chat-v3.1:free"
@@ -551,7 +551,7 @@ class MainState(rx.State):
                 model = (
                     "mistral-small-latest"
                     if task in ("spec", "plan")
-                    else "mistral-large-latest"
+                    else "open-devstral-small-1-1-25-07"
                 )
                 logging.info(
                     f"Successfully connected to MistralAI. Using model: {model}"
