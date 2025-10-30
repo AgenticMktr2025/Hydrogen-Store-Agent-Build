@@ -27,6 +27,9 @@ class MainState(rx.State):
     shopify_domain: str = ""
     storefront_token: str = ""
     private_token: str = ""
+    mistral_api_key: str = ""
+    openrouter_api_key: str = ""
+    openai_api_key: str = ""
     spec_json: dict[str, JsonValue] = {}
     file_plan: dict[str, JsonValue] = {}
     generated_files: dict[str, str] = {}

@@ -227,8 +227,67 @@ def review() -> rx.Component:
     )
 
 
+def settings() -> rx.Component:
+    return rx.el.div(
+        sidebar(),
+        rx.el.main(
+            rx.el.div(
+                rx.el.h1("Settings", class_name="text-2xl font-bold"),
+                rx.el.p(
+                    "Manage your API keys and other settings.",
+                    class_name="text-gray-500",
+                ),
+                rx.el.div(
+                    rx.el.h3("API Keys", class_name="text-lg font-semibold mt-6 mb-2"),
+                    rx.el.div(
+                        rx.el.label("Mistral API Key", class_name="font-medium"),
+                        rx.el.input(
+                            placeholder="Enter your Mistral API Key",
+                            name="mistral_api_key",
+                            default_value=MainState.mistral_api_key,
+                            on_change=MainState.set_mistral_api_key,
+                            class_name="w-full p-2 border rounded-md mt-1",
+                            type="password",
+                        ),
+                        class_name="mb-4",
+                    ),
+                    rx.el.div(
+                        rx.el.label("OpenRouter API Key", class_name="font-medium"),
+                        rx.el.input(
+                            placeholder="Enter your OpenRouter API Key",
+                            name="openrouter_api_key",
+                            default_value=MainState.openrouter_api_key,
+                            on_change=MainState.set_openrouter_api_key,
+                            class_name="w-full p-2 border rounded-md mt-1",
+                            type="password",
+                        ),
+                        class_name="mb-4",
+                    ),
+                    rx.el.div(
+                        rx.el.label("OpenAI API Key", class_name="font-medium"),
+                        rx.el.input(
+                            placeholder="Enter your OpenAI API Key",
+                            name="openai_api_key",
+                            default_value=MainState.openai_api_key,
+                            on_change=MainState.set_openai_api_key,
+                            class_name="w-full p-2 border rounded-md mt-1",
+                            type="password",
+                        ),
+                        class_name="mb-4",
+                    ),
+                    class_name="mt-6 bg-white p-6 rounded-lg border shadow-sm",
+                ),
+                class_name="p-8",
+            ),
+            class_name="flex-1",
+        ),
+        class_name="flex min-h-screen w-full bg-gray-50/50",
+    )
+
+
 app = rx.App(theme=rx.theme(appearance="light"))
 app.add_page(index, route="/")
 app.add_page(specs, route="/specs")
 app.add_page(files, route="/files")
 app.add_page(review, route="/review")
+app.add_page(settings, route="/settings")
