@@ -563,12 +563,17 @@ class MainState(rx.State):
                         "X-Title": "Hydrogen Builder",
                     },
                 )
+                model_to_test = (
+                    "deepseek/deepseek-chat-v3.1:free"
+                    if task in ("spec", "plan")
+                    else "minimax/minimax-m2"
+                )
                 await client.chat.completions.create(
-                    model="openrouter/auto",
+                    model=model_to_test,
                     messages=[{"role": "user", "content": "test"}],
                     max_tokens=20,
                 )
-                model = "openrouter/auto"
+                model = model_to_test
                 logging.info(
                     f"Successfully connected to OpenRouter. Using model: {model}"
                 )
