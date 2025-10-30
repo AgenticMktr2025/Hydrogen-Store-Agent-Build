@@ -568,11 +568,7 @@ class MainState(rx.State):
                     messages=[{"role": "user", "content": "test"}],
                     max_tokens=20,
                 )
-                model = (
-                    "deepseek/deepseek-chat-v3.1:free"
-                    if task in ("spec", "plan")
-                    else "minimax/minimax-chat-v2-10b"
-                )
+                model = "openrouter/auto"
                 logging.info(
                     f"Successfully connected to OpenRouter. Using model: {model}"
                 )
