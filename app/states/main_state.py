@@ -475,9 +475,9 @@ class MainState(rx.State):
         self, task: str
     ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
         """Gets the best available AI client and model, checking env vars."""
-        openrouter_api_key = self.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
-        openai_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
-        anthropic_api_key = self.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY") or self.openrouter_api_key
+        openai_api_key = os.getenv("OPENAI_API_KEY") or self.openai_api_key
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or self.anthropic_api_key
         if openrouter_api_key:
             try:
                 logging.info("Attempting to use OpenRouter")
@@ -504,7 +504,7 @@ class MainState(rx.State):
             try:
                 logging.info("Attempting to use Anthropic")
                 client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
-                model = "claude-3-5-sonnet-20240620"
+                model = "claude-3-haiku-20240307"
                 await client.messages.create(
                     model=model,
                     max_tokens=1,
