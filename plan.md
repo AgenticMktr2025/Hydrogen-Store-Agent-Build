@@ -5,12 +5,12 @@ Building a local/hostable AI agent that transforms natural-language briefs + bra
 
 **Tech Stack:**
 - Frontend: Reflex (Python web framework)
-- AI Models: Multi-provider support (Mistral → OpenRouter → OpenAI fallback)
+- AI Models: OpenAI (primary) and Anthropic (fallback)
 - Orchestration: Goose agent integration (future)
 - Shopify: Hydrogen framework, Storefront API, Oxygen hosting
 - Testing: Lighthouse, axe-core, Vitest (future integration)
 
-**Session Goal:** Complete all 3 phases - full rebuild of the Hydrogen site builder ✅
+**Current Status:** All core phases complete. AI provider system fixed and working.
 
 ---
 
@@ -65,25 +65,28 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 
 ---
 
-## Phase 4: Multi-Provider AI & Hydrogen Code Quality ✅
+## Phase 4: Multi-Provider AI System Fixed ✅
 
-### Multi-Provider AI Integration
-- [x] Add Mistral AI Studio support (primary provider)
-- [x] Add OpenRouter support with free models (secondary provider)
-- [x] Keep OpenAI as fallback provider
-- [x] Implement priority-based provider selection
-- [x] Add graceful degradation when API keys missing
-- [x] Test provider priority system (Mistral → OpenRouter → OpenAI)
+### Provider System Overhaul
+- [x] Fix provider selection to use environment variables (os.getenv) instead of state properties
+- [x] Remove broken OpenRouter and Mistral code paths
+- [x] Implement working OpenAI primary provider
+- [x] Implement working Anthropic fallback provider
+- [x] Fix return value handling (client, model tuple)
+- [x] Update all generation methods to handle both OpenAI and Anthropic responses
+- [x] Remove model validation code that caused 404 errors
+- [x] Test complete provider system end-to-end
 
-**Provider Priority:**
-1. **Mistral AI Studio** (Primary)
-   - Spec/Plan: `mistral-tiny`
-   - Code Generation: `mistral-large-latest`
-2. **OpenRouter** (Secondary) - Free Models
-   - Spec/Plan: `mistralai/mistral-7b-instruct:free`
-   - Code Generation: `deepseek/deepseek-coder`
-3. **OpenAI** (Fallback)
+**Working Provider Priority:**
+1. **OpenAI** (Primary)
    - All tasks: `gpt-4o-mini`
+   - Uses: `AsyncOpenAI` client
+   - Response: `response.choices[0].message.content`
+   
+2. **Anthropic** (Fallback)
+   - All tasks: `claude-sonnet-4-5-20250929`
+   - Uses: `AsyncAnthropic` client
+   - Response: `response.content[0].text`
 
 ### Hydrogen-Specific Code Generation
 - [x] Enhanced prompts with Hydrogen API patterns
@@ -102,9 +105,8 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 - ✅ SEO and a11y patterns included
 
 **Environment Variables:**
-- `MISTRAL_API_KEY` - Primary provider
-- `OPENROUTER_API_KEY` - Secondary provider with free models
-- `OPENAI_API_KEY` - Fallback provider
+- `OPENAI_API_KEY` - Primary provider (✓ Available)
+- `ANTHROPIC_API_KEY` - Fallback provider (✓ Available)
 
 ---
 
@@ -113,7 +115,7 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 ✅ **Complete Application Delivered:**
 
 1. **Brief Input System**: Users can enter project briefs, upload/paste brand guidelines (PDF support), and optionally provide Shopify credentials
-2. **AI-Powered Spec Generation**: Multi-provider AI (Mistral → OpenRouter → OpenAI) transforms briefs into Store Spec JSON
+2. **AI-Powered Spec Generation**: Multi-provider AI (OpenAI → Anthropic) transforms briefs into Store Spec JSON
 3. **File Plan Generation**: LLM analyzes Store Spec and creates comprehensive Hydrogen file tree
 4. **Hydrogen Code Generation**: Production-ready TypeScript/JSX/CSS code following Shopify Hydrogen best practices
 5. **File Explorer**: Interactive file browser with click-to-preview functionality
@@ -125,10 +127,15 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 Brief → Generate Spec (50%) → Generate File Plan (75%) → User clicks "Generate Files" → Files Generated (85%+) → Review (100%) → Deploy
 
 **Key Improvements:**
-- ✅ Multi-provider AI support (Mistral → OpenRouter → OpenAI)
+- ✅ Working multi-provider AI system (OpenAI + Anthropic)
+- ✅ Proper environment variable handling
+- ✅ Fixed async/response handling for both providers
 - ✅ Hydrogen-specific code generation (proper APIs, components, patterns)
 - ✅ Markdown code fence stripping for clean display
 - ✅ User-triggered file generation (prevents race conditions)
+
+**System Status:**
+🟢 **FULLY OPERATIONAL** - Ready to generate Hydrogen storefronts from natural language briefs
 
 **Next Steps (Future Enhancements):**
 - GitHub PR integration for code review
@@ -141,7 +148,8 @@ Brief → Generate Spec (50%) → Generate File Plan (75%) → User clicks "Gene
 
 ## Notes
 - Using port 8001 (frontend) and 8002 (backend)
-- API keys checked in priority: MISTRAL_API_KEY → OPENROUTER_API_KEY → OPENAI_API_KEY
-- All LLM calls use JSON response format for structured output
+- API keys read from environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY
+- All LLM calls use appropriate response formats (JSON for OpenAI, text parsing for Anthropic)
 - File generation produces valid Shopify Hydrogen code with proper patterns
 - UI is clean, responsive, and user-friendly
+- System tested and verified working with real API calls

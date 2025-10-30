@@ -1,12 +1,12 @@
 import reflex as rx
 import os
 import json
-import time
 import logging
-from typing import Any, TypedDict, cast
-from openai import AsyncOpenAI, APIConnectionError
+from typing import Any, TypedDict, cast, ForwardRef
+from openai import AsyncOpenAI
 from pypdf import PdfReader
 import io
+import anthropic
 
 
 class TreeNode(TypedDict):
@@ -54,19 +54,9 @@ class MainState(rx.State):
         content = content.strip()
         if content.startswith("") and content.endswith(""):
             lines = content.splitlines()
-            if lines:
-                start_index = 0
-                for i, line in enumerate(lines):
-                    if not line.strip().startswith(""):
-                        start_index = i
-                        break
-                end_index = len(lines)
-                for i in range(len(lines) - 1, -1, -1):
-                    if not lines[i].strip().startswith(""):
-                        end_index = i + 1
-                        break
+            if len(lines) > 1:
                 return """
-""".join(lines[start_index:end_index])
+""".join(lines[1:-1])
         return content
 
     @rx.var
@@ -192,23 +182,39 @@ class MainState(rx.State):
         try:
             client, model = await self._get_client_and_model("spec")
             prompt = f"You are a Shopify Hydrogen expert. Convert the user's brief into a structured JSON object that strictly follows the provided schema. Fill in all fields.\n\nUSER BRIEF:\n{self.brief_text}\n\nBRAND GUIDELINES:\n{self.brand_guidelines}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY valid JSON.\n2.  You MUST include ALL fields from this schema template:\n    {json.dumps(full_schema, indent=2)}\n3.  Fill in values from the brief where provided.\n4.  For the `nav` field, create an array of objects, where each object has a `label` (the nav item name) and an `href` (a slugified, lowercase path, e.g., '/about-us').\n5.  Keep default values for fields not mentioned in the brief.\n6.  Ensure the JSON is complete, valid, and matches the full schema structure.\n\nReturn the complete JSON now:"
-            response = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a Shopify Hydrogen expert specializing in creating structured JSON specs from natural language.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.2,
-            )
-            spec_string = response.choices[0].message.content
+            spec_string = ""
+            if isinstance(client, AsyncOpenAI):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert specializing in creating structured JSON specs from natural language. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                )
+                spec_string = response.choices[0].message.content
+            elif isinstance(client, anthropic.AsyncAnthropic):
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert specializing in creating structured JSON specs from natural language. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.2,
+                )
+                spec_string = response.content[0].text
             async with self:
                 if not spec_string:
                     raise ValueError("Received empty response from AI.")
-                self.spec_json = json.loads(spec_string)
+                self.spec_json = json.loads(self._strip_markdown_code(spec_string))
                 if self.shopify_domain:
                     self.spec_json.setdefault("store", {})["domain"] = (
                         self.shopify_domain
@@ -241,23 +247,39 @@ class MainState(rx.State):
         try:
             client, model = await self._get_client_and_model("plan")
             prompt = f"""You are a Shopify Hydrogen expert. Based on the provided Store Spec JSON, generate a file plan for a new Hydrogen project. The file plan should be a JSON object where keys are file paths and values are a brief description of the file's purpose (the 'intent').\n\nStore Spec:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY a valid JSON object representing the file plan.\n2.  Include all necessary files for a basic Hydrogen project: routes, components, styles, and configuration.\n3.  Create routes based on the `nav` and `catalog` sections of the spec.\n4.  Create components for header, footer, product cards, etc.\n5.  Structure the file paths correctly (e.g., `app/routes/_index.tsx`, `app/components/Header.tsx`).\n6.  The output must be a single JSON object with file paths as keys and string descriptions as values.\n\nExample Output Format:\n{{\n  "app/root.tsx": "React Router root, theme provider, and global layout.",\n  "app/routes/_index.tsx": "The home page component.",\n  "app/components/Header.tsx": "Site header with navigation derived from spec."\n}}\n\nGenerate the complete file plan now."""
-            response = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a Shopify Hydrogen expert that generates file plans from JSON specifications.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-            )
-            file_plan_str = response.choices[0].message.content
+            file_plan_str = ""
+            if isinstance(client, AsyncOpenAI):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert that generates file plans from JSON specifications. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.1,
+                )
+                file_plan_str = response.choices[0].message.content
+            elif isinstance(client, anthropic.AsyncAnthropic):
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a Shopify Hydrogen expert that generates file plans from JSON specifications. You must respond with only a valid JSON object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.1,
+                )
+                file_plan_str = response.content[0].text
             async with self:
                 if not file_plan_str:
                     raise ValueError("Received empty response from AI for file plan.")
-                self.file_plan = json.loads(file_plan_str)
+                self.file_plan = json.loads(self._strip_markdown_code(file_plan_str))
                 self.is_generating_plan = False
                 self.current_progress = 75
                 self.progress_message = "File plan generated."
@@ -293,22 +315,37 @@ class MainState(rx.State):
                     )
                     self.current_progress = 75 + int(i / total_files * 25)
                 prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the raw code for the file - no explanations, no markdown code fences, no extra text.\n2. Use modern TypeScript, React, and TailwindCSS.\n3. For route files (`app/routes/**/*.tsx`), you MUST export a `loader` function for data fetching and a `meta` function for SEO, even if they are empty.\n4. Use `@shopify/hydrogen-react` components like `Money` for prices and `Image` for media.\n5. Use the Storefront API client via `context.storefront.query()` inside loaders.\n6. Follow Remix conventions for routing and data loading.\n\nGenerate the raw code for `{path}` now - nothing else:"
-                response = await client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=0.1,
-                )
-                raw_code = response.choices[0].message.content
-                cleaned_code = self._strip_markdown_code(raw_code)
-                if cleaned_code:
+                raw_code = ""
+                if isinstance(client, AsyncOpenAI):
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.1,
+                    )
+                    raw_code = response.choices[0].message.content
+                elif isinstance(client, anthropic.AsyncAnthropic):
+                    response = await client.messages.create(
+                        model=model,
+                        max_tokens=4096,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.1,
+                    )
+                    raw_code = response.content[0].text
+                if raw_code:
                     async with self:
-                        self.generated_files[path] = cleaned_code
+                        self.generated_files[path] = self._strip_markdown_code(raw_code)
             async with self:
                 self.is_generating_files = False
                 self.current_progress = 100
@@ -327,125 +364,36 @@ class MainState(rx.State):
                 self.progress_message = "File generation failed."
                 yield rx.toast.error(self.error_message)
 
-    @rx.event(background=True)
-    async def test_mistral_connection(self):
-        """Test the connection to the Mistral API."""
-        async with self:
-            self.is_testing_mistral = True
-            yield
-        try:
-            if not self.mistral_api_key:
-                raise ValueError("Mistral API Key is not set.")
-            client = AsyncOpenAI(
-                api_key=self.mistral_api_key, base_url="https://api.mistral.ai/v1"
-            )
-            await client.models.list()
-            yield rx.toast.success("Mistral connection successful!")
-        except Exception as e:
-            logging.exception(f"Mistral connection failed: {e}")
-            yield rx.toast.error(f"Mistral Error: {e}")
-        finally:
-            async with self:
-                self.is_testing_mistral = False
-
-    @rx.event(background=True)
-    async def test_openrouter_connection(self):
-        """Test the connection to the OpenRouter API."""
-        async with self:
-            self.is_testing_openrouter = True
-            yield
-        try:
-            if not self.openrouter_api_key:
-                raise ValueError("OpenRouter API Key is not set.")
-            client = AsyncOpenAI(
-                api_key=self.openrouter_api_key, base_url="https://openrouter.ai/api/v1"
-            )
-            await client.models.list()
-            yield rx.toast.success("OpenRouter connection successful!")
-        except Exception as e:
-            logging.exception(f"OpenRouter connection failed: {e}")
-            yield rx.toast.error(f"OpenRouter Error: {e}")
-        finally:
-            async with self:
-                self.is_testing_openrouter = False
-
-    @rx.event(background=True)
-    async def test_openai_connection(self):
-        """Test the connection to the OpenAI API."""
-        async with self:
-            self.is_testing_openai = True
-            yield
-        try:
-            if not self.openai_api_key:
-                raise ValueError("OpenAI API Key is not set.")
-            client = AsyncOpenAI(api_key=self.openai_api_key)
-            await client.models.list()
-            yield rx.toast.success("OpenAI connection successful!")
-        except Exception as e:
-            logging.exception(f"OpenAI connection failed: {e}")
-            yield rx.toast.error(f"OpenAI Error: {e}")
-        finally:
-            async with self:
-                self.is_testing_openai = False
-
-    async def _get_client_and_model(self, task: str) -> tuple[AsyncOpenAI, str]:
-        openrouter_models = {
-            "spec": "minimax/minimax-m2:free",
-            "plan": "minimax/minimax-m2:free",
-            "code": "deepseek/deepseek-chat",
-        }
-        openrouter_fallbacks = [
-            "deepseek/deepseek-chat-v3.1:free",
-            "moonshotai/kimi-k2:free",
-            "nvidia/nemotron-nano-9b-v2:free",
-            "openai/gpt-oss-20b:free",
-        ]
-        if self.openrouter_api_key:
-            client = AsyncOpenAI(
-                api_key=self.openrouter_api_key, base_url="https://openrouter.ai/api/v1"
-            )
-            primary_model = openrouter_models.get(task, "minimax/minimax-m2:free")
+    async def _get_client_and_model(
+        self, task: str
+    ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
+        """Gets the best available AI client and model, checking env vars."""
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        if openai_api_key:
             try:
-                await client.models.retrieve(primary_model)
-                return (client, primary_model)
-            except Exception as e:
-                logging.exception(
-                    f"OpenRouter primary model {primary_model} failed, trying fallbacks: {e}"
-                )
-            for model in openrouter_fallbacks:
-                try:
-                    await client.models.retrieve(model)
-                    return (client, model)
-                except Exception as e:
-                    logging.exception(f"OpenRouter fallback model {model} failed: {e}")
-                    continue
-        if self.mistral_api_key:
-            try:
-                client = AsyncOpenAI(
-                    api_key=self.mistral_api_key, base_url="https://api.mistral.ai/v1"
-                )
-                model = "mistral-large-latest" if task == "code" else "mistral-tiny"
-                await client.models.retrieve(model)
+                logging.info("Attempting to use OpenAI")
+                client = AsyncOpenAI(api_key=openai_api_key)
+                model = "gpt-4o-mini"
+                await client.models.list()
+                logging.info(f"Using OpenAI model: {model}")
                 return (client, model)
             except Exception as e:
-                logging.exception(f"Mistral connection failed: {e}")
-        if self.openai_api_key:
+                logging.exception(f"OpenAI check failed: {e}. Falling back.")
+        if anthropic_api_key:
             try:
-                client = AsyncOpenAI(api_key=self.openai_api_key)
-                model = "gpt-4o"
-                await client.models.retrieve(model)
+                logging.info("Attempting to use Anthropic")
+                client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
+                model = "claude-3-5-sonnet-20240620"
+                await client.count_tokens("test", model=model)
+                logging.info(f"Using Anthropic model: {model}")
                 return (client, model)
             except Exception as e:
-                logging.exception(f"OpenAI connection failed: {e}")
-        if self.anthropic_api_key:
-            try:
-                logging.info("Anthropic client would be used here.")
-            except Exception as e:
-                logging.exception(f"Anthropic connection failed: {e}")
+                logging.exception(f"Anthropic check failed: {e}. No providers left.")
         raise ValueError("No valid API key or connection available for any provider.")
 
     @rx.event
-    def handle_brief_submit(self, form_data: dict[str, Any]):
+    def handle_brief_submit(self, form_data: dict[str, str]):
         """Handle the submission of the brief form."""
         self.brief_text = form_data.get("brief_text", "")
         self.brand_guidelines = form_data.get("brand_guidelines", "")
