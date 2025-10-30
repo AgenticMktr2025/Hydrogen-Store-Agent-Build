@@ -183,34 +183,50 @@ def review() -> rx.Component:
         sidebar(),
         rx.el.main(
             rx.el.div(
-                rx.el.h1("Review & Deploy", class_name="text-2xl font-bold"),
-                rx.el.p(
-                    "Review the changes and deploy to production.",
-                    class_name="text-gray-500",
+                rx.el.div(
+                    rx.el.h1("Review", class_name="text-2xl font-bold"),
+                    rx.el.p(
+                        "Review the generated storefront and request amendments.",
+                        class_name="text-gray-500",
+                    ),
+                    class_name="mb-6",
                 ),
                 rx.el.div(
                     rx.el.div(
-                        rx.el.div(
-                            rx.el.h3("Generated Files", class_name="font-semibold"),
-                            rx.icon("folder-git-2", class_name="h-5 w-5 text-gray-500"),
-                            class_name="flex items-center justify-between pb-2 border-b",
+                        rx.el.h2(
+                            "Live Preview", class_name="text-xl font-semibold mb-4"
                         ),
-                        rx.el.div(
-                            rx.el.p("Total Files", class_name="text-sm text-gray-600"),
-                            rx.el.p(
-                                MainState.file_plan.keys().length().to_string(),
-                                class_name="font-semibold text-lg",
-                            ),
-                            class_name="flex items-center justify-between pt-4",
+                        rx.el.iframe(
+                            src="http://localhost:3000",
+                            class_name="w-full h-[600px] border border-gray-300 rounded-lg bg-white",
                         ),
-                        class_name="bg-white p-4 rounded-lg border shadow-sm",
+                        class_name="flex-1",
                     ),
-                    class_name="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6",
+                    rx.el.div(
+                        rx.el.h2(
+                            "Request Amendments",
+                            class_name="text-xl font-semibold mb-4",
+                        ),
+                        rx.el.div(
+                            rx.el.textarea(
+                                placeholder="Describe the changes you'd like to see...",
+                                name="amendments",
+                                class_name="w-full min-h-[150px] p-2 border rounded-md mb-4",
+                            ),
+                            rx.el.button(
+                                "Submit Amendments",
+                                class_name="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700",
+                            ),
+                            class_name="bg-white p-6 rounded-lg border shadow-sm",
+                        ),
+                        class_name="w-full lg:w-96 lg:ml-6 mt-6 lg:mt-0",
+                    ),
+                    class_name="flex flex-col lg:flex-row",
                 ),
                 rx.el.div(
                     rx.el.a(
-                        "< Back to Files",
-                        href="/files",
+                        "< Back to Validate",
+                        href="/validate",
                         class_name="text-gray-600 hover:text-gray-900",
                     ),
                     rx.el.a(
@@ -218,7 +234,7 @@ def review() -> rx.Component:
                         href="/deploy",
                         class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
                     ),
-                    class_name="mt-6 flex justify-between items-center",
+                    class_name="mt-8 flex justify-between items-center",
                 ),
                 class_name="p-8",
             ),
