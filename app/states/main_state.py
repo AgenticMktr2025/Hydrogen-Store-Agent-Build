@@ -309,7 +309,7 @@ class MainState(rx.State):
             if not api_key:
                 api_key = os.environ.get("OPENROUTER_API_KEY")
                 base_url = "https://openrouter.ai/api/v1"
-                model = "deepseek/deepseek-coder"
+                model = "deepseek/deepseek-chat"
             if not api_key:
                 api_key = os.environ.get("OPENAI_API_KEY")
                 base_url = None
