@@ -194,7 +194,7 @@ class MainState(rx.State):
             if not api_key:
                 api_key = os.environ.get("OPENROUTER_API_KEY")
                 base_url = "https://openrouter.ai/api/v1"
-                model = "mistralai/mistral-7b-instruct:free"
+                model = "moonshotai/kimi-k2:free"
             if not api_key:
                 api_key = os.environ.get("OPENAI_API_KEY")
                 base_url = None
@@ -254,7 +254,7 @@ class MainState(rx.State):
             if not api_key:
                 api_key = os.environ.get("OPENROUTER_API_KEY")
                 base_url = "https://openrouter.ai/api/v1"
-                model = "mistralai/mistral-7b-instruct:free"
+                model = "deepseek/deepseek-chat"
             if not api_key:
                 api_key = os.environ.get("OPENAI_API_KEY")
                 base_url = None
