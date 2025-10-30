@@ -99,9 +99,18 @@ class MainState(rx.State):
             if not self.openrouter_api_key:
                 raise ValueError("OpenRouter API Key is not set.")
             client = AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1", api_key=self.openrouter_api_key
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.openrouter_api_key,
+                default_headers={
+                    "HTTP-Referer": "http://localhost:3000",
+                    "X-Title": "Hydrogen Builder",
+                },
             )
-            await client.models.list()
+            await client.chat.completions.create(
+                model="openrouter/auto",
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
+            )
             async with self:
                 self.is_testing_openrouter = False
                 yield rx.toast.success("OpenRouter connection successful!")
@@ -475,46 +484,61 @@ class MainState(rx.State):
         self, task: str
     ) -> tuple[AsyncOpenAI | anthropic.AsyncAnthropic, str]:
         """Gets the best available AI client and model, checking env vars."""
-        openrouter_api_key = os.getenv("OPENROUTER_API_KEY") or self.openrouter_api_key
-        openai_api_key = os.getenv("OPENAI_API_KEY") or self.openai_api_key
-        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or self.anthropic_api_key
-        if openrouter_api_key:
+        openrouter_key = (
+            os.getenv("OPENROUTER_API_KEY") or self.openrouter_api_key or None
+        )
+        openai_key = os.getenv("OPENAI_API_KEY") or self.openai_api_key or None
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY") or self.anthropic_api_key or None
+        if openrouter_key:
             try:
-                logging.info("Attempting to use OpenRouter")
+                logging.info("Attempting to use OpenRouter...")
                 client = AsyncOpenAI(
-                    base_url="https://openrouter.ai/api/v1", api_key=openrouter_api_key
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=openrouter_key,
+                    default_headers={
+                        "HTTP-Referer": "http://localhost:3000",
+                        "X-Title": "Hydrogen Builder",
+                    },
                 )
+                await client.models.list()
                 model = "deepseek/deepseek-coder"
-                await client.models.list()
-                logging.info(f"Using OpenRouter model: {model}")
+                logging.info(
+                    f"Successfully connected to OpenRouter. Using model: {model}"
+                )
                 return (client, model)
             except Exception as e:
-                logging.exception(f"OpenRouter check failed: {e}. Falling back.")
-        if openai_api_key:
+                logging.exception(f"OpenRouter connection failed: {e}. Falling back.")
+        if openai_key:
             try:
-                logging.info("Attempting to use OpenAI")
-                client = AsyncOpenAI(api_key=openai_api_key)
+                logging.info("Attempting to use OpenAI...")
+                client = AsyncOpenAI(api_key=openai_key)
+                await client.models.list()
                 model = "gpt-4o-mini"
-                await client.models.list()
-                logging.info(f"Using OpenAI model: {model}")
+                logging.info(f"Successfully connected to OpenAI. Using model: {model}")
                 return (client, model)
             except Exception as e:
-                logging.exception(f"OpenAI check failed: {e}. Falling back.")
-        if anthropic_api_key:
+                logging.exception(f"OpenAI connection failed: {e}. Falling back.")
+        if anthropic_key:
             try:
-                logging.info("Attempting to use Anthropic")
-                client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
+                logging.info("Attempting to use Anthropic...")
+                client = anthropic.AsyncAnthropic(api_key=anthropic_key)
                 model = "claude-3-haiku-20240307"
                 await client.messages.create(
                     model=model,
                     max_tokens=1,
                     messages=[{"role": "user", "content": "test"}],
                 )
-                logging.info(f"Using Anthropic model: {model}")
+                logging.info(
+                    f"Successfully connected to Anthropic. Using model: {model}"
+                )
                 return (client, model)
             except Exception as e:
-                logging.exception(f"Anthropic check failed: {e}. No providers left.")
-        raise ValueError("No valid API key or connection available for any provider.")
+                logging.exception(
+                    f"Anthropic connection failed: {e}. No providers left."
+                )
+        raise ValueError(
+            "No valid API key or connection available for any provider. Checked OpenRouter, OpenAI, and Anthropic."
+        )
 
     @rx.event
     def handle_brief_submit(self, form_data: dict[str, str]):
