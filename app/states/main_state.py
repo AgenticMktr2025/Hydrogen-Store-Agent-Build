@@ -45,6 +45,8 @@ class MainState(rx.State):
     is_testing_openrouter: bool = False
     is_testing_mistralai: bool = False
     is_validating: bool = False
+    is_fixing_files: bool = False
+    files_being_fixed: set[str] = set()
     validation_results: dict[str, list[dict]] = {}
     current_progress: int = 0
     progress_message: str = "Awaiting brief submission."
@@ -178,21 +180,21 @@ class MainState(rx.State):
                 yield rx.toast.warning("Validation issues found.")
 
     def _strip_markdown_code(self, content: str | None) -> str:
-        """Strips markdown code fences and extracts the first valid JSON object from a string."""
+        """Strips markdown code fences from a string, designed for code files."""
         if not content:
             return ""
-        backtick = chr(96)
-        fence = backtick * 3
-        if fence in content:
-            match = re.search(
-                f"{fence}(?:[a-zA-Z]+)?\\s*(.*?)\\s*{fence}", content, re.DOTALL
-            )
-            if match:
-                content = match.group(1)
-        start = content.find("{")
-        end = content.rfind("}")
-        if start != -1 and end != -1 and (end > start):
-            return content[start : end + 1]
+        pattern = "^(?:[a-zA-Z]+)?\\n(.*?)\\n$"
+        match = re.match(pattern, content, re.DOTALL | re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+        fence = ""
+        if content.startswith(fence):
+            first_line_end = content.find("""
+""")
+            code_start_pos = first_line_end + 1
+            end_fence_pos = content.rfind(f"\n{fence}")
+            if end_fence_pos != -1:
+                return content[code_start_pos:end_fence_pos].strip()
         return content.strip()
 
     @rx.var
@@ -481,7 +483,8 @@ class MainState(rx.State):
                     raw_code = response.content[0].text
                 if raw_code:
                     async with self:
-                        self.generated_files[path] = self._strip_markdown_code(raw_code)
+                        cleaned_code = self._strip_markdown_code(raw_code)
+                        self.generated_files[path] = cleaned_code
             async with self:
                 self.is_generating_files = False
                 self.current_progress = 100
@@ -601,3 +604,59 @@ class MainState(rx.State):
         self.storefront_token = form_data.get("storefront_token", "")
         self.private_token = form_data.get("private_token", "")
         yield MainState.generate_specification
+
+    @rx.event(background=True)
+    async def fix_file_issue(self, path: str, issue: dict):
+        """Uses an LLM to fix a single validation issue in a file."""
+        from app.validation.validator import CodeValidator
+
+        async with self:
+            self.files_being_fixed.add(path)
+            yield
+        try:
+            client, model = await self._get_client_and_model("code")
+            original_code = self.generated_files.get(path, "")
+            if not original_code:
+                raise ValueError("Original code not found.")
+            prompt = f"You are an expert Shopify Hydrogen developer specializing in fixing code errors. Your task is to fix a specific issue in the provided file. Only return the corrected code, without any explanations or markdown fences.\n\nFile Path: {path}\n\nIssue to Fix:\nLine {issue['line']}: {issue['message']}\n\nOriginal Code:\ntypescript\n{original_code}\n\n\nCRITICAL INSTRUCTIONS:\n1.  Address ONLY the specified issue. Do not refactor or change other parts of the code.\n2.  Return ONLY the complete, corrected code for the entire file.\n3.  Do NOT include any markdown fences () or explanatory text in your response.\n\nReturn the full, corrected code now:"
+            fixed_code = ""
+            if isinstance(client, AsyncOpenAI):
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                fixed_code = response.choices[0].message.content
+            elif isinstance(client, anthropic.AsyncAnthropic):
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                fixed_code = response.content[0].text
+            if not fixed_code:
+                raise ValueError("LLM returned an empty response.")
+            cleaned_fixed_code = self._strip_markdown_code(fixed_code)
+            validator = CodeValidator()
+            new_issues = validator.validate_file(path, cleaned_fixed_code)
+            async with self:
+                self.generated_files[path] = cleaned_fixed_code
+                if path == self.selected_file:
+                    self.selected_file_content = cleaned_fixed_code
+                if not new_issues:
+                    if path in self.validation_results:
+                        del self.validation_results[path]
+                    yield rx.toast.success(f"Fixed issues in {path}")
+                else:
+                    self.validation_results[path] = new_issues
+                    yield rx.toast.warning(
+                        f"Attempted to fix {path}, but issues remain."
+                    )
+        except Exception as e:
+            logging.exception(f"Error fixing file {path}: {e}")
+            async with self:
+                yield rx.toast.error(f"Failed to fix {path}: {e}")
+        finally:
+            async with self:
+                self.files_being_fixed.remove(path)

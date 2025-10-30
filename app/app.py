@@ -471,7 +471,24 @@ def validate() -> rx.Component:
                                         rx.el.span(
                                             issue["message"], class_name="text-sm"
                                         ),
-                                        class_name="p-2 border-b",
+                                        rx.el.button(
+                                            rx.cond(
+                                                MainState.files_being_fixed.contains(
+                                                    path
+                                                ),
+                                                rx.spinner(class_name="h-3 w-3"),
+                                                rx.icon("wrench", class_name="h-3 w-3"),
+                                            ),
+                                            "Fix Issue",
+                                            on_click=MainState.fix_file_issue(
+                                                path, issue
+                                            ),
+                                            disabled=MainState.files_being_fixed.contains(
+                                                path
+                                            ),
+                                            class_name="ml-auto text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-md flex items-center gap-1",
+                                        ),
+                                        class_name="p-2 border-b flex items-center",
                                     ),
                                 ),
                                 class_name="mb-4 border rounded-lg bg-white",
