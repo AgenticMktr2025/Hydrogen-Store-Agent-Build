@@ -39,6 +39,28 @@ class MainState(rx.State):
     selected_file: str = ""
     selected_file_content: str = ""
 
+    def _strip_markdown_code(self, content: str | None) -> str:
+        """Strips markdown code fences from a string."""
+        if not content:
+            return ""
+        content = content.strip()
+        if content.startswith("") and content.endswith(""):
+            lines = content.splitlines()
+            if lines:
+                start_index = 0
+                for i, line in enumerate(lines):
+                    if not line.strip().startswith(""):
+                        start_index = i
+                        break
+                end_index = len(lines)
+                for i in range(len(lines) - 1, -1, -1):
+                    if not lines[i].strip().startswith(""):
+                        end_index = i + 1
+                        break
+                return """
+""".join(lines[start_index:end_index])
+        return content
+
     @rx.var
     def spec_json_string(self) -> str:
         """The spec JSON as a formatted string."""
@@ -262,22 +284,23 @@ class MainState(rx.State):
                         f"Generating file {i + 1}/{total_files}: {path}"
                     )
                     self.current_progress = 75 + int(i / total_files * 25)
-                prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY the raw code for the file. Do not include any explanations, markdown, or extra text.\n2.  The code must be complete and correct for a Shopify Hydrogen project.\n3.  Use TypeScript and React for components and routes (`.tsx`).\n4.  Base all logic, content, and styling on the provided Project Specification.\n5.  For components, use TailwindCSS for styling as defined in the spec.\n6.  For routes, implement data fetching using Shopify's Storefront API.\n\nGenerate the code for `{path}` now."
+                prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the raw code for the file - no explanations, no markdown code fences, no extra text\n2. Start directly with the import statements or code\n3. Do not wrap in tsx or  blocks\n4. The code must be complete and correct for a Shopify Hydrogen project\n5. Use TypeScript and React for components and routes (.tsx)\n\nGenerate the raw code for `{path}` now - nothing else:"
                 response = await client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a Shopify Hydrogen expert that generates complete code files from a specification and file intent.",
+                            "content": "You generate raw TypeScript/React code files. Return ONLY code - no markdown, no explanations.",
                         },
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.1,
                 )
-                code = response.choices[0].message.content
-                if code:
+                raw_code = response.choices[0].message.content
+                cleaned_code = self._strip_markdown_code(raw_code)
+                if cleaned_code:
                     async with self:
-                        self.generated_files[path] = code
+                        self.generated_files[path] = cleaned_code
             async with self:
                 self.is_generating_files = False
                 self.current_progress = 100
