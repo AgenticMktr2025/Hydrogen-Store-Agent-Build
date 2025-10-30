@@ -109,7 +109,7 @@ class MainState(rx.State):
             await client.chat.completions.create(
                 model="openrouter/auto",
                 messages=[{"role": "user", "content": "test"}],
-                max_tokens=1,
+                max_tokens=20,
             )
             async with self:
                 self.is_testing_openrouter = False
