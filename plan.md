@@ -5,7 +5,7 @@ Building a local/hostable AI agent that transforms natural-language briefs + bra
 
 **Tech Stack:**
 - Frontend: Reflex (Python web framework)
-- AI Models: OpenAI API (gpt-4o-mini for spec and code generation)
+- AI Models: Multi-provider support (Mistral → OpenRouter → OpenAI fallback)
 - Orchestration: Goose agent integration (future)
 - Shopify: Hydrogen framework, Storefront API, Oxygen hosting
 - Testing: Lighthouse, axe-core, Vitest (future integration)
@@ -53,7 +53,8 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 - [x] Add deployment status tracking and file count display
 - [x] Implement progress tracking through complete workflow (25% → 50% → 75% → 100%)
 - [x] Test complete workflow: Spec → File Plan → Generated Files → Review
-- [x] **Fix crash after generation by removing automatic file generation trigger**
+- [x] Fix crash after generation by removing automatic file generation trigger
+- [x] Fix markdown code fence stripping for clean code display
 
 **Implementation Notes:**
 - File explorer uses flat list approach (no recursion) for stability
@@ -62,11 +63,48 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 - Review page shows file summary and deployment readiness
 - All async operations have proper loading states and error handling
 
-**Critical Fix (Post-Generation Crash):**
-- **Issue:** App crashed after file plan generation due to automatic triggering of `generate_all_files` via `yield MainState.generate_all_files`
-- **Root Cause:** Chaining background tasks creates race conditions and state management conflicts
-- **Solution:** Removed automatic trigger. Users now explicitly click "Generate Files" button on /files page
-- **Benefit:** Gives users control over each phase, prevents race conditions, more stable UX
+---
+
+## Phase 4: Multi-Provider AI & Hydrogen Code Quality ✅
+
+### Multi-Provider AI Integration
+- [x] Add Mistral AI Studio support (primary provider)
+- [x] Add OpenRouter support with free models (secondary provider)
+- [x] Keep OpenAI as fallback provider
+- [x] Implement priority-based provider selection
+- [x] Add graceful degradation when API keys missing
+- [x] Test provider priority system (Mistral → OpenRouter → OpenAI)
+
+**Provider Priority:**
+1. **Mistral AI Studio** (Primary)
+   - Spec/Plan: `mistral-tiny`
+   - Code Generation: `mistral-large-latest`
+2. **OpenRouter** (Secondary) - Free Models
+   - Spec/Plan: `mistralai/mistral-7b-instruct:free`
+   - Code Generation: `deepseek/deepseek-coder`
+3. **OpenAI** (Fallback)
+   - All tasks: `gpt-4o-mini`
+
+### Hydrogen-Specific Code Generation
+- [x] Enhanced prompts with Hydrogen API patterns
+- [x] Added Remix/React Router conventions (loader, meta exports)
+- [x] Required @shopify/hydrogen-react component usage
+- [x] Added Storefront API client patterns (context.storefront.query)
+- [x] Included GraphQL query examples
+- [x] Added TailwindCSS styling requirements
+
+**Hydrogen Code Requirements:**
+- ✅ Routes export: `loader`, `meta`, default component
+- ✅ Uses `@shopify/hydrogen-react` components (Money, Image, CartForm)
+- ✅ Storefront API client via `context.storefront.query()`
+- ✅ Follows Remix conventions (React Router v6+)
+- ✅ TypeScript + TailwindCSS for styling
+- ✅ SEO and a11y patterns included
+
+**Environment Variables:**
+- `MISTRAL_API_KEY` - Primary provider
+- `OPENROUTER_API_KEY` - Secondary provider with free models
+- `OPENAI_API_KEY` - Fallback provider
 
 ---
 
@@ -75,33 +113,35 @@ Complete the workflow with file generation, review UI, and deployment preparatio
 ✅ **Complete Application Delivered:**
 
 1. **Brief Input System**: Users can enter project briefs, upload/paste brand guidelines (PDF support), and optionally provide Shopify credentials
-2. **AI-Powered Spec Generation**: OpenAI gpt-4o-mini transforms natural language briefs into structured Store Spec JSON with all required fields
-3. **File Plan Generation**: LLM analyzes Store Spec and creates comprehensive Hydrogen file tree with intents
-4. **Code Generation**: Each file is generated with actual TypeScript/JSX/CSS code based on Store Spec (user-triggered)
+2. **AI-Powered Spec Generation**: Multi-provider AI (Mistral → OpenRouter → OpenAI) transforms briefs into Store Spec JSON
+3. **File Plan Generation**: LLM analyzes Store Spec and creates comprehensive Hydrogen file tree
+4. **Hydrogen Code Generation**: Production-ready TypeScript/JSX/CSS code following Shopify Hydrogen best practices
 5. **File Explorer**: Interactive file browser with click-to-preview functionality
 6. **Code Preview**: Syntax-highlighted code display for all generated files
 7. **Review & Deploy**: Summary page showing file count and deployment readiness
 8. **Progress Tracking**: Real-time progress indicators through entire workflow
 
 **Workflow:**
-Brief → Generate Spec (50%) → Generate File Plan (75%) → **User clicks "Generate Files"** → Files Generated (85%+) → Review (100%) → Deploy
+Brief → Generate Spec (50%) → Generate File Plan (75%) → User clicks "Generate Files" → Files Generated (85%+) → Review (100%) → Deploy
 
-**Key Change:** File generation is now user-triggered (not automatic) to prevent race conditions and crashes.
+**Key Improvements:**
+- ✅ Multi-provider AI support (Mistral → OpenRouter → OpenAI)
+- ✅ Hydrogen-specific code generation (proper APIs, components, patterns)
+- ✅ Markdown code fence stripping for clean display
+- ✅ User-triggered file generation (prevents race conditions)
 
 **Next Steps (Future Enhancements):**
 - GitHub PR integration for code review
 - Oxygen deployment automation via Shopify CLI
 - Lighthouse/a11y automated testing
 - Local testing with Mini-Oxygen
-- OpenRouter integration for multi-model support
 - Goose agent orchestration for autonomous development
 
 ---
 
 ## Notes
 - Using port 8001 (frontend) and 8002 (backend)
-- OpenAI API key required: OPENAI_API_KEY
-- All LLM calls use gpt-4o-mini with JSON response format
-- File generation is fully functional and tested
+- API keys checked in priority: MISTRAL_API_KEY → OPENROUTER_API_KEY → OPENAI_API_KEY
+- All LLM calls use JSON response format for structured output
+- File generation produces valid Shopify Hydrogen code with proper patterns
 - UI is clean, responsive, and user-friendly
-- **Crash fix implemented:** Removed automatic file generation chaining to prevent race conditions

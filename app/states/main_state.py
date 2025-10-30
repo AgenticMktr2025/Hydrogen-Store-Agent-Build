@@ -182,10 +182,21 @@ class MainState(rx.State):
             "environments": {"preview": True, "production": True},
         }
         try:
-            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            api_key = os.environ.get("MISTRAL_API_KEY")
+            base_url = "https://api.mistral.ai/v1"
+            model = "mistral-tiny"
+            if not api_key:
+                api_key = os.environ.get("OPENROUTER_API_KEY")
+                base_url = "https://openrouter.ai/api/v1"
+                model = "mistralai/mistral-7b-instruct:free"
+            if not api_key:
+                api_key = os.environ.get("OPENAI_API_KEY")
+                base_url = None
+                model = "gpt-4o-mini"
+            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
             prompt = f"You are a Shopify Hydrogen expert. Convert the user's brief into a structured JSON object that strictly follows the provided schema. Fill in all fields.\n\nUSER BRIEF:\n{self.brief_text}\n\nBRAND GUIDELINES:\n{self.brand_guidelines}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY valid JSON.\n2.  You MUST include ALL fields from this schema template:\n    {json.dumps(full_schema, indent=2)}\n3.  Fill in values from the brief where provided.\n4.  For the `nav` field, create an array of objects, where each object has a `label` (the nav item name) and an `href` (a slugified, lowercase path, e.g., '/about-us').\n5.  Keep default values for fields not mentioned in the brief.\n6.  Ensure the JSON is complete, valid, and matches the full schema structure.\n\nReturn the complete JSON now:"
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[
                     {
                         "role": "system",
@@ -231,10 +242,21 @@ class MainState(rx.State):
             self.progress_message = "Generating file plan..."
             self.error_message = ""
         try:
-            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            api_key = os.environ.get("MISTRAL_API_KEY")
+            base_url = "https://api.mistral.ai/v1"
+            model = "mistral-tiny"
+            if not api_key:
+                api_key = os.environ.get("OPENROUTER_API_KEY")
+                base_url = "https://openrouter.ai/api/v1"
+                model = "mistralai/mistral-7b-instruct:free"
+            if not api_key:
+                api_key = os.environ.get("OPENAI_API_KEY")
+                base_url = None
+                model = "gpt-4o-mini"
+            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
             prompt = f"""You are a Shopify Hydrogen expert. Based on the provided Store Spec JSON, generate a file plan for a new Hydrogen project. The file plan should be a JSON object where keys are file paths and values are a brief description of the file's purpose (the 'intent').\n\nStore Spec:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1.  Return ONLY a valid JSON object representing the file plan.\n2.  Include all necessary files for a basic Hydrogen project: routes, components, styles, and configuration.\n3.  Create routes based on the `nav` and `catalog` sections of the spec.\n4.  Create components for header, footer, product cards, etc.\n5.  Structure the file paths correctly (e.g., `app/routes/_index.tsx`, `app/components/Header.tsx`).\n6.  The output must be a single JSON object with file paths as keys and string descriptions as values.\n\nExample Output Format:\n{{\n  "app/root.tsx": "React Router root, theme provider, and global layout.",\n  "app/routes/_index.tsx": "The home page component.",\n  "app/components/Header.tsx": "Site header with navigation derived from spec."\n}}\n\nGenerate the complete file plan now."""
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[
                     {
                         "role": "system",
@@ -275,7 +297,18 @@ class MainState(rx.State):
             self.progress_message = "Generating files..."
             self.generated_files = {}
         try:
-            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            api_key = os.environ.get("MISTRAL_API_KEY")
+            base_url = "https://api.mistral.ai/v1"
+            model = "mistral-large-latest"
+            if not api_key:
+                api_key = os.environ.get("OPENROUTER_API_KEY")
+                base_url = "https://openrouter.ai/api/v1"
+                model = "deepseek/deepseek-coder"
+            if not api_key:
+                api_key = os.environ.get("OPENAI_API_KEY")
+                base_url = None
+                model = "gpt-4o-mini"
+            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
             file_items = list(self.file_plan.items())
             total_files = len(file_items)
             for i, (path, intent) in enumerate(file_items):
@@ -284,13 +317,13 @@ class MainState(rx.State):
                         f"Generating file {i + 1}/{total_files}: {path}"
                     )
                     self.current_progress = 75 + int(i / total_files * 25)
-                prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the raw code for the file - no explanations, no markdown code fences, no extra text\n2. Start directly with the import statements or code\n3. Do not wrap in tsx or  blocks\n4. The code must be complete and correct for a Shopify Hydrogen project\n5. Use TypeScript and React for components and routes (.tsx)\n\nGenerate the raw code for `{path}` now - nothing else:"
+                prompt = f"You are an expert Shopify Hydrogen developer. Generate the full, production-ready code for the file at `{path}`.\n\nFile Intent: {intent}\n\nProject Specification:\n{self.spec_json_string}\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the raw code for the file - no explanations, no markdown code fences, no extra text.\n2. Use modern TypeScript, React, and TailwindCSS.\n3. For route files (`app/routes/**/*.tsx`), you MUST export a `loader` function for data fetching and a `meta` function for SEO, even if they are empty.\n4. Use `@shopify/hydrogen-react` components like `Money` for prices and `Image` for media.\n5. Use the Storefront API client via `context.storefront.query()` inside loaders.\n6. Follow Remix conventions for routing and data loading.\n\nGenerate the raw code for `{path}` now - nothing else:"
                 response = await client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model,
                     messages=[
                         {
                             "role": "system",
-                            "content": "You generate raw TypeScript/React code files. Return ONLY code - no markdown, no explanations.",
+                            "content": "You generate raw TypeScript/React code files for Shopify Hydrogen. You return ONLY code, no markdown or explanations.",
                         },
                         {"role": "user", "content": prompt},
                     ],
