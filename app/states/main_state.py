@@ -183,18 +183,13 @@ class MainState(rx.State):
         """Strips markdown code fences from a string, designed for code files."""
         if not content:
             return ""
-        pattern = "^(?:[a-zA-Z]+)?\\n(.*?)\\n$"
-        match = re.match(pattern, content, re.DOTALL | re.MULTILINE)
+        match = re.search("(?:json)?\\n(.*?)\\n", content, re.DOTALL)
         if match:
             return match.group(1).strip()
-        fence = ""
-        if content.startswith(fence):
-            first_line_end = content.find("""
-""")
-            code_start_pos = first_line_end + 1
-            end_fence_pos = content.rfind(f"\n{fence}")
-            if end_fence_pos != -1:
-                return content[code_start_pos:end_fence_pos].strip()
+        start = content.find("{")
+        end = content.rfind("}")
+        if start != -1 and end != -1 and (end > start):
+            return content[start : end + 1].strip()
         return content.strip()
 
     @rx.var
