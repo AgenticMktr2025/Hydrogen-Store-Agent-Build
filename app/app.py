@@ -213,9 +213,10 @@ def review() -> rx.Component:
                         href="/files",
                         class_name="text-gray-600 hover:text-gray-900",
                     ),
-                    rx.el.button(
-                        "Deploy to Oxygen",
-                        class_name="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700",
+                    rx.el.a(
+                        "Proceed to Deploy ->",
+                        href="/deploy",
+                        class_name="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700",
                     ),
                     class_name="mt-6 flex justify-between items-center",
                 ),
@@ -297,6 +298,58 @@ def settings() -> rx.Component:
 app = rx.App(theme=rx.theme(appearance="light"))
 app.add_page(index, route="/")
 app.add_page(specs, route="/specs")
+
+
+def deploy() -> rx.Component:
+    return rx.el.div(
+        sidebar(),
+        rx.el.main(
+            rx.el.div(
+                rx.el.h1("Deploy Project", class_name="text-2xl font-bold"),
+                rx.el.p(
+                    "Deploy your generated Hydrogen storefront to production.",
+                    class_name="text-gray-500",
+                ),
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.h3("Deployment Actions", class_name="font-semibold mb-4"),
+                        rx.el.div(
+                            rx.el.button(
+                                rx.icon("github", class_name="h-5 w-5 mr-2"),
+                                "Push to New GitHub Repo",
+                                class_name="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 flex items-center",
+                            ),
+                            rx.el.button(
+                                rx.icon("rocket", class_name="h-5 w-5 mr-2"),
+                                "Deploy to Shopify Oxygen",
+                                class_name="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center",
+                            ),
+                            class_name="flex items-center gap-4",
+                        ),
+                        class_name="bg-white p-6 rounded-lg border shadow-sm mt-6",
+                    ),
+                    class_name="grid gap-6 md:grid-cols-1 lg:grid-cols-2 mt-6",
+                ),
+                rx.el.div(
+                    rx.el.a(
+                        "< Back to Review",
+                        href="/review",
+                        class_name="text-gray-600 hover:text-gray-900",
+                    ),
+                    class_name="mt-6 flex justify-between items-center",
+                ),
+                class_name="p-8",
+            ),
+            class_name="flex-1",
+        ),
+        class_name="flex min-h-screen w-full bg-gray-50/50",
+    )
+
+
+app = rx.App(theme=rx.theme(appearance="light"))
+app.add_page(index, route="/")
+app.add_page(specs, route="/specs")
 app.add_page(files, route="/files")
 app.add_page(review, route="/review")
+app.add_page(deploy, route="/deploy")
 app.add_page(settings, route="/settings")

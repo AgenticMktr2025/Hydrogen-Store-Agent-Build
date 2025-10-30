@@ -55,6 +55,7 @@ class MainState(rx.State):
         if content.startswith("") and content.endswith(""):
             lines = content.splitlines()
             if len(lines) > 1:
+                start_index = 1
                 return """
 """.join(lines[1:-1])
         return content
@@ -282,9 +283,9 @@ class MainState(rx.State):
                 self.file_plan = json.loads(self._strip_markdown_code(file_plan_str))
                 self.is_generating_plan = False
                 self.current_progress = 75
-                self.progress_message = "File plan generated."
+                self.progress_message = "File plan generated. Now generating files..."
                 yield rx.toast.success("File plan generated successfully!")
-                yield rx.redirect("/files")
+                yield MainState.generate_all_files
         except Exception as e:
             logging.exception(f"Error generating file plan: {e}")
             async with self:
@@ -354,7 +355,10 @@ class MainState(rx.State):
                 if not self.selected_file and self.generated_files:
                     first_file = next(iter(self.generated_files.keys()), None)
                     if first_file:
-                        self.view_file(first_file)
+                        self.selected_file = first_file
+                        self.selected_file_content = self.generated_files.get(
+                            first_file, "File content not found."
+                        )
                 yield rx.redirect("/files")
         except Exception as e:
             logging.exception(f"Error generating files: {e}")

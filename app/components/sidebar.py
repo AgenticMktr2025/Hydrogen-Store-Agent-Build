@@ -51,10 +51,16 @@ def sidebar() -> rx.Component:
                         MainState.router.page.path == "/files",
                     ),
                     nav_item(
-                        "Review & Deploy",
+                        "Review",
                         "/review",
                         "git-pull-request-draft",
                         MainState.router.page.path == "/review",
+                    ),
+                    nav_item(
+                        "Deploy",
+                        "/deploy",
+                        "rocket",
+                        MainState.router.page.path == "/deploy",
                     ),
                     class_name="grid items-start px-4 text-sm font-medium",
                 ),
