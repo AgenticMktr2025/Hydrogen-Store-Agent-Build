@@ -241,37 +241,76 @@ def settings() -> rx.Component:
                     rx.el.h3("API Keys", class_name="text-lg font-semibold mt-6 mb-2"),
                     rx.el.div(
                         rx.el.label("Mistral API Key", class_name="font-medium"),
-                        rx.el.input(
-                            placeholder="Enter your Mistral API Key",
-                            name="mistral_api_key",
-                            default_value=MainState.mistral_api_key,
-                            on_change=MainState.set_mistral_api_key,
-                            class_name="w-full p-2 border rounded-md mt-1",
-                            type="password",
+                        rx.el.div(
+                            rx.el.input(
+                                placeholder="Enter your Mistral API Key",
+                                name="mistral_api_key",
+                                default_value=MainState.mistral_api_key,
+                                on_change=MainState.set_mistral_api_key,
+                                class_name="w-full p-2 border rounded-md",
+                                type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_mistral,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    rx.icon("plug-zap", class_name="h-4 w-4"),
+                                ),
+                                on_click=MainState.test_mistral_connection,
+                                disabled=MainState.is_testing_mistral,
+                                class_name="px-4 py-2 border rounded-md bg-gray-50 hover:bg-gray-100",
+                            ),
+                            class_name="flex items-center gap-2 mt-1",
                         ),
                         class_name="mb-4",
                     ),
                     rx.el.div(
                         rx.el.label("OpenRouter API Key", class_name="font-medium"),
-                        rx.el.input(
-                            placeholder="Enter your OpenRouter API Key",
-                            name="openrouter_api_key",
-                            default_value=MainState.openrouter_api_key,
-                            on_change=MainState.set_openrouter_api_key,
-                            class_name="w-full p-2 border rounded-md mt-1",
-                            type="password",
+                        rx.el.div(
+                            rx.el.input(
+                                placeholder="Enter your OpenRouter API Key",
+                                name="openrouter_api_key",
+                                default_value=MainState.openrouter_api_key,
+                                on_change=MainState.set_openrouter_api_key,
+                                class_name="w-full p-2 border rounded-md",
+                                type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_openrouter,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    rx.icon("plug-zap", class_name="h-4 w-4"),
+                                ),
+                                on_click=MainState.test_openrouter_connection,
+                                disabled=MainState.is_testing_openrouter,
+                                class_name="px-4 py-2 border rounded-md bg-gray-50 hover:bg-gray-100",
+                            ),
+                            class_name="flex items-center gap-2 mt-1",
                         ),
                         class_name="mb-4",
                     ),
                     rx.el.div(
                         rx.el.label("OpenAI API Key", class_name="font-medium"),
-                        rx.el.input(
-                            placeholder="Enter your OpenAI API Key",
-                            name="openai_api_key",
-                            default_value=MainState.openai_api_key,
-                            on_change=MainState.set_openai_api_key,
-                            class_name="w-full p-2 border rounded-md mt-1",
-                            type="password",
+                        rx.el.div(
+                            rx.el.input(
+                                placeholder="Enter your OpenAI API Key",
+                                name="openai_api_key",
+                                default_value=MainState.openai_api_key,
+                                on_change=MainState.set_openai_api_key,
+                                class_name="w-full p-2 border rounded-md",
+                                type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    MainState.is_testing_openai,
+                                    rx.spinner(class_name="h-4 w-4"),
+                                    rx.icon("plug-zap", class_name="h-4 w-4"),
+                                ),
+                                on_click=MainState.test_openai_connection,
+                                disabled=MainState.is_testing_openai,
+                                class_name="px-4 py-2 border rounded-md bg-gray-50 hover:bg-gray-100",
+                            ),
+                            class_name="flex items-center gap-2 mt-1",
                         ),
                         class_name="mb-4",
                     ),

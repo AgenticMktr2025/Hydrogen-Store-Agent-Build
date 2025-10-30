@@ -36,6 +36,9 @@ class MainState(rx.State):
     is_generating_spec: bool = False
     is_generating_plan: bool = False
     is_generating_files: bool = False
+    is_testing_mistral: bool = False
+    is_testing_openrouter: bool = False
+    is_testing_openai: bool = False
     current_progress: int = 0
     progress_message: str = "Awaiting brief submission."
     error_message: str = ""
@@ -354,6 +357,67 @@ class MainState(rx.State):
                 self.is_generating_files = False
                 self.progress_message = "File generation failed."
                 yield rx.toast.error(self.error_message)
+
+    @rx.event(background=True)
+    async def test_mistral_connection(self):
+        """Test the connection to the Mistral API."""
+        async with self:
+            self.is_testing_mistral = True
+            yield
+        try:
+            if not self.mistral_api_key:
+                raise ValueError("Mistral API Key is not set.")
+            client = AsyncOpenAI(
+                api_key=self.mistral_api_key, base_url="https://api.mistral.ai/v1"
+            )
+            await client.models.list()
+            yield rx.toast.success("Mistral connection successful!")
+        except Exception as e:
+            logging.exception(f"Mistral connection failed: {e}")
+            yield rx.toast.error(f"Mistral Error: {e}")
+        finally:
+            async with self:
+                self.is_testing_mistral = False
+
+    @rx.event(background=True)
+    async def test_openrouter_connection(self):
+        """Test the connection to the OpenRouter API."""
+        async with self:
+            self.is_testing_openrouter = True
+            yield
+        try:
+            if not self.openrouter_api_key:
+                raise ValueError("OpenRouter API Key is not set.")
+            client = AsyncOpenAI(
+                api_key=self.openrouter_api_key, base_url="https://openrouter.ai/api/v1"
+            )
+            await client.models.list()
+            yield rx.toast.success("OpenRouter connection successful!")
+        except Exception as e:
+            logging.exception(f"OpenRouter connection failed: {e}")
+            yield rx.toast.error(f"OpenRouter Error: {e}")
+        finally:
+            async with self:
+                self.is_testing_openrouter = False
+
+    @rx.event(background=True)
+    async def test_openai_connection(self):
+        """Test the connection to the OpenAI API."""
+        async with self:
+            self.is_testing_openai = True
+            yield
+        try:
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API Key is not set.")
+            client = AsyncOpenAI(api_key=self.openai_api_key)
+            await client.models.list()
+            yield rx.toast.success("OpenAI connection successful!")
+        except Exception as e:
+            logging.exception(f"OpenAI connection failed: {e}")
+            yield rx.toast.error(f"OpenAI Error: {e}")
+        finally:
+            async with self:
+                self.is_testing_openai = False
 
     @rx.event
     def handle_brief_submit(self, form_data: dict[str, Any]):
